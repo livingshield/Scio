@@ -80,6 +80,23 @@ builder.Services.AddSignalR();
 
 var app = builder.Build();
 
+// Apply migrations automatically
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<ScioDbContext>();
+        context.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while migrating the database.");
+        // We continue anyway, as the DB might be already updated or accessible
+    }
+}
+
 app.UsePathBase("/scio");
 
 // ENABLE DETAILED ERRORS even in production for debugging

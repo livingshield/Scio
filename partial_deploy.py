@@ -1,5 +1,6 @@
 import ftplib
 import os
+import time
 
 def partial_deploy():
     HOST = 'windows11.aspone.cz'
@@ -19,9 +20,12 @@ def partial_deploy():
             # Rename if dll/exe to avoid lock
             if file.endswith(('.dll', '.exe')):
                 try:
-                    ftp.rename(file, f"{file}.bak")
-                except:
-                    pass
+                    bak_name = f"{file}.{int(time.time())}.bak"
+                    ftp.rename(file, bak_name)
+                    print(f"  Renamed {file} to {bak_name}")
+                except Exception as e:
+                    print(f"  Could not rename {file}: {e}")
+            
             with open(local_path, 'rb') as f:
                 ftp.storbinary(f"STOR {file}", f)
     
