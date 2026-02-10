@@ -62,26 +62,25 @@ public class AuthController : Controller
     [HttpGet("google-response")]
     public async Task<IActionResult> GoogleResponse()
     {
+        // When we arrive here, Google middleware has already signed in the user to the default scheme
         var result = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        // This is tricky because Google middleware signs into its own scheme or the default.
-        // We actually want the info from the Identity created by Google.
         
-        var extResult = await HttpContext.AuthenticateAsync("TempCookie"); // We'll use a temp cookie for the handshake
-        if (!extResult.Succeeded)
-            return Redirect("/scio/login?error=Google authentication failed");
+        if (!result.Succeeded || result.Principal == null)
+            return Redirect("~/login?error=Google authentication failed");
 
-        var claims = extResult.Principal.Identities.FirstOrDefault()?.Claims;
+        var claims = result.Principal.Identities.FirstOrDefault()?.Claims;
         var googleId = claims?.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
         var email = claims?.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
         var name = claims?.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
 
         if (string.IsNullOrEmpty(googleId) || string.IsNullOrEmpty(email))
-            return Redirect("/scio/login?error=Google account info missing");
+            return Redirect("~/login?error=Google account info missing");
 
         var authResult = await _authService.LoginOrRegisterGoogleAsync(googleId, email, name ?? email);
 
         if (authResult.Success && authResult.User != null)
         {
+            // Update claims with our internal User ID and Role
             var userClaims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, authResult.User.Id.ToString()),
@@ -91,15 +90,17 @@ public class AuthController : Controller
             };
 
             var claimsIdentity = new ClaimsIdentity(userClaims, CookieAuthenticationDefaults.AuthenticationScheme);
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity));
             
-            // Clean up temp cookie
-            await HttpContext.SignOutAsync("TempCookie");
+            // Re-sign with full claims
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme, 
+                new ClaimsPrincipal(claimsIdentity),
+                new AuthenticationProperties { IsPersistent = true });
 
-            return Redirect("/scio/");
+            return Redirect("~/");
         }
 
-        return Redirect($"/scio/login?error={Uri.EscapeDataString(authResult.Message)}");
+        return Redirect($"~/login?error={Uri.EscapeDataString(authResult.Message)}");
     }
 
     [HttpGet("logout")]

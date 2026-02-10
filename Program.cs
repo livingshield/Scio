@@ -38,7 +38,8 @@ builder.Services.AddAntiforgery(options =>
 });
 
 builder.Services.AddDataProtection()
-    .SetApplicationName("ScioApp");
+    .SetApplicationName("ScioApp")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "App_Data", "Keys")));
 
 // Authentication & Authorization
 builder.Services.AddAuthentication(options => 
@@ -52,15 +53,15 @@ builder.Services.AddAuthentication(options =>
         options.AccessDeniedPath = "/access-denied";
         options.Cookie.Name = "Scio_Auth";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
     })
-    .AddCookie("TempCookie") // Temporary scheme for Google handshake
     .AddGoogle(options =>
     {
         options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "YOUR_GOOGLE_CLIENT_ID";
         options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "YOUR_GOOGLE_CLIENT_SECRET";
-        options.SignInScheme = "TempCookie";
+        // Google will sign in directly to our main cookie
     });
 
 builder.Services.AddAuthorization();
