@@ -15,10 +15,13 @@
 
         <AuthorizeView>
             <Authorized>
-                <div class="alert alert-warning small py-2 mb-3">
-                    <span class="bi bi-exclamation-triangle-fill"></span>
-                    Jste přihlášen jako učitel (@context.User.Identity?.Name).
-                    <a href="auth/logout" class="text-danger fw-bold ml-1">Odhlásit se</a>
+                <div class="alert alert-warning small py-1 mb-3 shadow-sm border-warning">
+                    <div class="fw-bold"><span class="bi bi-exclamation-triangle-fill"></span> Pozor: Testujete v jednom prohlížeči</div>
+                    <div style="font-size: 0.75rem; opacity: 0.9;">
+                        Jste přihlášen jako učitel (@context.User.Identity?.Name). Prohlížeč sdílí přihlášení mezi okny.
+                        Pro testování žáka doporučujeme použít <strong>Anonymní okno</strong>.
+                    </div>
+                    <a href="auth/logout" class="btn btn-sm btn-link text-danger p-0 mt-1 fw-bold text-decoration-none" style="font-size: 0.75rem;">Odhlásit učitele</a>
                 </div>
             </Authorized>
         </AuthorizeView>
@@ -99,22 +102,31 @@
         isSubmitting = true;
         errorMessage = null;
 
-        var deviceId = await GetOrCreateDeviceId();
-        var result = await StudentService.JoinGroupAsync(InviteCode, Nickname, deviceId);
-
-        if (result.Success && result.Student != null)
+        try
         {
-            // Save info to local storage for persistence
-            await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"scio_group_{result.Student.GroupId}_nick", result.Student.Nickname);
-            
-            NavigationManager.NavigateTo($"chat/{result.Student.GroupId}");
-        }
-        else
-        {
-            errorMessage = result.Message;
-        }
+            var deviceId = await GetOrCreateDeviceId();
+            var result = await StudentService.JoinGroupAsync(InviteCode, Nickname, deviceId);
 
-        isSubmitting = false;
+            if (result.Success && result.Student != null)
+            {
+                // Save info to local storage for persistence
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"scio_group_{result.Student.GroupId}_nick", result.Student.Nickname);
+                
+                NavigationManager.NavigateTo($"chat/{result.Student.GroupId}");
+            }
+            else
+            {
+                errorMessage = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Nepodařilo se připojit: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
     }
 
     private async Task<string> GetOrCreateDeviceId()

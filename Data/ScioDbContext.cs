@@ -142,8 +142,8 @@ public class ScioDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(255);
             
-            // Composite unique index - DeviceId musí být unique per skupina
-            entity.HasIndex(e => new { e.GroupId, e.DeviceId })
+            // Composite unique index - DeviceId + Nickname musí být unique per skupina
+            entity.HasIndex(e => new { e.GroupId, e.DeviceId, e.Nickname })
                 .IsUnique();
             
             entity.Property(e => e.JoinedAt)
