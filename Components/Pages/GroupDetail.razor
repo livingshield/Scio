@@ -6,6 +6,7 @@
 @using ScioApp.Services
 @attribute [Authorize]
 @inject IGroupService GroupService
+@inject IStudentService StudentService
 @inject IEmailService EmailService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
@@ -112,10 +113,15 @@
                                 </div>
                                 @if (student.Status == StudentStatus.NeedHelp)
                                 {
-                                    <div class="card-footer bg-danger text-white py-1 text-center x-small fw-bold border-top-0 d-flex align-items-center justify-content-center gap-2">
-                                        <span>POMOC!</span>
-                                        <button class="btn btn-sm btn-light py-0 px-2" style="font-size: 0.7rem;" @onclick:stopPropagation="true" @onclick="() => ResolveHelp(student.Id)">
-                                            ✔ Vyřešeno
+                                    <div class="card-footer bg-danger text-white py-1 text-center x-small fw-bold border-top-0 d-flex align-items-center justify-content-between px-2">
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span>POMOC!</span>
+                                            <button class="btn btn-sm btn-light py-0 px-1" style="font-size: 0.65rem;" @onclick:stopPropagation="true" @onclick="() => ResolveHelp(student.Id)">
+                                                ✔ OK
+                                            </button>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-light py-0 px-1 border-0" title="Odstranit studenta" @onclick:stopPropagation="true" @onclick="() => RemoveStudent(student.Id)">
+                                            <span class="bi bi-trash"></span>
                                         </button>
                                     </div>
                                 }
@@ -140,9 +146,16 @@
             {
                 <div class="col-md-5 col-lg-4">
                     <div class="card shadow-sm sticky-top" style="top: 1rem; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
-                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0 text-truncate">Detail: @selStudent.Nickname</h5>
-                            <button class="btn-close" @onclick="() => selectedStudentId = null"></button>
+                        <div class="card-header bg-white">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <h5 class="mb-0 text-truncate">Detail: @selStudent.Nickname</h5>
+                                <button class="btn-close" @onclick="() => selectedStudentId = null"></button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-danger btn-sm py-0 flex-grow-1" @onclick="() => RemoveStudent(selStudent.Id)" title="Odstranit studenta ze skupiny">
+                                    <span class="bi bi-trash"></span> Odstranit studenta
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body overflow-auto p-0">
                             <div class="p-3 bg-light border-bottom">
@@ -292,6 +305,22 @@
             await hubConnection.InvokeAsync("SendTeacherMessage", GroupId, selectedStudentId.Value, teacherMessageText);
             teacherMessageText = "";
             StateHasChanged();
+        }
+    }
+
+    private async Task RemoveStudent(int studentId)
+    {
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Opravdu chcete odstranit studenta ze skupiny? Smažou se i jeho zprávy a pokrok.");
+        if (!confirmed) return;
+
+        var success = await StudentService.DeleteStudentAsync(studentId);
+        if (success)
+        {
+            if (selectedStudentId == studentId)
+            {
+                selectedStudentId = null;
+            }
+            await RefreshStudents();
         }
     }
 

@@ -8,6 +8,7 @@ public interface IStudentService
 {
     Task<(bool Success, string Message, Student? Student)> JoinGroupAsync(string inviteCode, string nickname, string deviceId);
     Task<Student?> GetStudentByNicknameAndDeviceAsync(int groupId, string nickname, string deviceId);
+    Task<bool> DeleteStudentAsync(int studentId);
 }
 
 public class StudentService : IStudentService
@@ -68,5 +69,15 @@ public class StudentService : IStudentService
             .Include(s => s.ProgressLog)
             .Include(s => s.Group)
             .FirstOrDefaultAsync(s => s.GroupId == groupId && s.Nickname == nickname && s.DeviceId == deviceId);
+    }
+
+    public async Task<bool> DeleteStudentAsync(int studentId)
+    {
+        var student = await _context.Students.FindAsync(studentId);
+        if (student == null) return false;
+
+        _context.Students.Remove(student);
+        await _context.SaveChangesAsync();
+        return true;
     }
 }
