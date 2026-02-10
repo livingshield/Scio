@@ -21,13 +21,13 @@ public class ScioHub : Hub
         _context = context;
     }
 
-    public async Task JoinGroup(int groupId, string deviceId, bool isTeacher)
+    public async Task JoinGroup(int groupId, string deviceId, string nickname, bool isTeacher)
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, $"group_{groupId}");
         
         if (!isTeacher)
         {
-            var student = await _studentService.GetStudentByDeviceAsync(groupId, deviceId);
+            var student = await _studentService.GetStudentByNicknameAndDeviceAsync(groupId, nickname, deviceId);
             if (student != null)
             {
                 await Clients.Group($"group_{groupId}").SendAsync("UserJoined", student.Nickname);

@@ -7,7 +7,7 @@ namespace ScioApp.Services;
 public interface IStudentService
 {
     Task<(bool Success, string Message, Student? Student)> JoinGroupAsync(string inviteCode, string nickname, string deviceId);
-    Task<Student?> GetStudentByDeviceAsync(int groupId, string deviceId);
+    Task<Student?> GetStudentByNicknameAndDeviceAsync(int groupId, string nickname, string deviceId);
 }
 
 public class StudentService : IStudentService
@@ -25,10 +25,10 @@ public class StudentService : IStudentService
         if (group == null)
             return (false, "Neplatný nebo neaktivní kód skupiny.", null);
 
-        // Check if device already in group
+        // Check if this specific name and device already in group
         var existingStudent = await _context.Students
             .Include(s => s.ProgressLog)
-            .FirstOrDefaultAsync(s => s.GroupId == group.Id && s.DeviceId == deviceId);
+            .FirstOrDefaultAsync(s => s.GroupId == group.Id && s.DeviceId == deviceId && s.Nickname == nickname);
 
         if (existingStudent != null)
         {
@@ -68,11 +68,11 @@ public class StudentService : IStudentService
         return (true, "Úspěšně připojeno.", student);
     }
 
-    public async Task<Student?> GetStudentByDeviceAsync(int groupId, string deviceId)
+    public async Task<Student?> GetStudentByNicknameAndDeviceAsync(int groupId, string nickname, string deviceId)
     {
         return await _context.Students
             .Include(s => s.ProgressLog)
             .Include(s => s.Group)
-            .FirstOrDefaultAsync(s => s.GroupId == groupId && s.DeviceId == deviceId);
+            .FirstOrDefaultAsync(s => s.GroupId == groupId && s.Nickname == nickname && s.DeviceId == deviceId);
     }
 }

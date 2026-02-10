@@ -333,7 +333,7 @@
         });
 
         await hubConnection.StartAsync();
-        await hubConnection.InvokeAsync("JoinGroup", GroupId, "", true);
+        await hubConnection.InvokeAsync("JoinGroup", GroupId, "", "", true);
     }
 
     private void SelectStudent(int id)

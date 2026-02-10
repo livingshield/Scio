@@ -159,13 +159,15 @@
         if (firstRender)
         {
             var deviceId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "scio_device_id");
-            if (string.IsNullOrEmpty(deviceId))
+            var myNick = await JSRuntime.InvokeAsync<string>("localStorage.getItem", $"scio_group_{GroupId}_nick");
+
+            if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(myNick))
             {
                 NavigationManager.NavigateTo($"join/{GroupId}");
                 return;
             }
 
-            student = await StudentService.GetStudentByDeviceAsync(GroupId, deviceId);
+            student = await StudentService.GetStudentByNicknameAndDeviceAsync(GroupId, myNick, deviceId);
             if (student == null)
             {
                 NavigationManager.NavigateTo($"join/{GroupId}");
@@ -247,7 +249,7 @@
             });
 
             await hubConnection.StartAsync();
-            await hubConnection.InvokeAsync("JoinGroup", GroupId, deviceId, false);
+            await hubConnection.InvokeAsync("JoinGroup", GroupId, deviceId, myNick, false);
             
             StartWatchdog();
             
