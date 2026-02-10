@@ -9,123 +9,183 @@
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
-<PageTitle>Chat výuky - Scio</PageTitle>
+<PageTitle>@group?.Name - Scio</PageTitle>
 
-<div class="chat-wrapper">
-    <div class="chat-header">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-            <h2 class="h5 mb-0"><span class="bi bi-chat-dots-fill mr-2"></span> @group?.Name</h2>
-            <div class="d-flex align-items-center gap-2">
-                <AuthorizeView>
-                    <Authorized>
-                        <div class="badge bg-warning text-dark border-0 p-2" style="font-size: 0.7rem;">
-                            <span class="bi bi-exclamation-triangle"></span> Testujete jako: <strong>@context.User.Identity?.Name</strong> (Učitel)
-                            <a href="auth/logout" class="text-decoration-none text-danger ml-2 fw-bold">Odhlásit</a>
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="height: 100vh; background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);">
+        <div class="text-center fade-in">
+            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+            <div class="h5 text-muted fw-light">Připravujeme učebnu...</div>
+        </div>
+    </div>
+}
+else if (student != null)
+{
+    <div class="chat-wrapper fade-in">
+        <header class="chat-header glass-card m-2">
+            <div class="container-fluid d-flex justify-content-between align-items-center py-2 px-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="header-icon bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px;">
+                        <span class="bi bi-chat-heart-fill"></span>
+                    </div>
+                    <div>
+                        <h1 class="h6 mb-0 fw-bold text-truncate" style="max-width: 200px;">@group?.Name</h1>
+                        <div class="small text-muted d-flex align-items-center gap-1">
+                            <span class="status-dot @(hubConnection?.State == HubConnectionState.Connected ? "connected" : "disconnected")"></span>
+                            @(hubConnection?.State == HubConnectionState.Connected ? "Online" : "Odpojeno")
                         </div>
-                    </Authorized>
-                </AuthorizeView>
-                @if (student != null)
-                {
-                    <div class="badge @(GetStatusBadgeClass(student.Status)) px-3 py-2">
-                        @statusLabels[student.Status]
                     </div>
-                }
-            </div>
-        </div>
-        <div class="goal-alert">
-            <strong>Cíl:</strong> @group?.GoalDescription
-        </div>
-    </div>
-
-    @if (group?.GoalType == GoalType.Boolean)
-    {
-        <div class="progress-bar-container d-flex align-items-center justify-content-center" style="padding: 2px 0;">
-            @if (student?.ProgressLog?.IsCompleted == true)
-            {
-                <span class="badge bg-success">✔ Cíl splněn</span>
-            }
-            else
-            {
-                <span class="badge bg-secondary">☐ Cíl dosud nesplněn</span>
-            }
-        </div>
-    }
-    else
-    {
-        <div class="progress-bar-container">
-            <div class="progress" style="height: 5px;">
-                <div class="progress-bar bg-success" role="progressbar"
-                     style="width: @(student?.ProgressLog?.Percentage ?? 0)%"
-                     aria-valuenow="@(student?.ProgressLog?.Percentage ?? 0)"
-                     aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-        </div>
-    }
-
-    <div class="chat-messages" id="chatLines">
-        @foreach (var msg in messages)
-        {
-            <div class="message @(msg.StudentId == student?.Id ? "own" : "") @(msg.IsFromTeacher ? "teacher" : "") @(msg.IsSystemMessage ? "system" : "") @(msg.IsProgressContribution ? "contribution" : "") @(msg.Metadata?.IsRelevant == false ? "is-irrelevant" : "")">
-                @if (!msg.IsSystemMessage && msg.StudentId != student?.Id)
-                {
-                    <div class="sender">
-                        <span class="bi @(msg.IsFromTeacher ? "bi-person-badge-fill" : "bi-person")"></span>
-                        @(msg.Nickname ?? "Ostatní")
+                </div>
+                <div class="header-actions">
+                    <div class="badge bg-white text-dark shadow-sm d-flex align-items-center gap-2 py-2 px-3 border-0">
+                        <span class="bi bi-person-circle text-primary"></span>
+                        <span>@student.Nickname</span>
                     </div>
-                }
-                @if (msg.IsFromTeacher)
-                {
-                    <div class="teacher-tag"><span class="bi bi-mortarboard-fill"></span> Zpráva od učitele</div>
-                }
-                <div class="content">@msg.Content</div>
-                @if (msg.IsProgressContribution)
-                {
-                    <div class="contribution-badge"><span class="bi bi-patch-check-fill"></span> Uznán pokrok</div>
-                }
-                @if (msg.Metadata?.IsRelevant == false)
-                {
-                    <div class="irrelevant-badge"><span class="bi bi-exclamation-triangle"></span> Nerelevantní k cíli</div>
-                }
-                @if (!string.IsNullOrEmpty(msg.Metadata?.StudentFeedback))
-                {
-                    <div class="ai-feedback">
-                        <span class="bi bi-info-circle"></span> @msg.Metadata.StudentFeedback
-                    </div>
-                }
-                <div class="time">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</div>
-            </div>
-        }
-    </div>
-
-    <div class="chat-input-area">
-        @if (showInactivityWarning)
-        {
-            <div class="alert alert-warning py-1 px-3 mb-0 rounded-0 border-0 x-small text-center">
-                <span class="bi bi-clock-history"></span> Pár minut už jsi nic nenapsal(a). Pracuješ na úkolu?
-            </div>
-        }
-        <div class="container py-2">
-            <div class="small fw-bold text-muted mb-1">Sem napište své řešení příkladu:</div>
-            <div class="d-flex gap-2">
-                <button class="btn @(isNeedsHelp ? "btn-danger" : "btn-outline-danger") btn-sm" @onclick="ToggleHelp" title="Klikněte, pokud si nevíte rady - upozorní to učitele">
-                    <span class="bi bi-question-circle"></span>
-                    <span class="d-none d-md-inline"> Potřebuji pomoc</span>
-                </button>
-                <textarea @bind="newMessage" @bind:event="oninput"
-                          class="form-control" placeholder="Napište výsledek nebo postup..." rows="2" style="resize: none;"></textarea>
-                <div class="d-flex flex-column gap-1">
-                    <button class="btn btn-primary h-100 px-3" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(newMessage))">
-                        <span class="bi bi-send d-block d-md-inline"></span>
-                        <span class="fw-bold">Odeslat</span>
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="StartVoice" title="Diktovat hlasem">
-                        <span class="bi bi-mic-fill @(isListening ? "text-danger" : "")"></span>
-                    </button>
                 </div>
             </div>
-        </div>
+        </header>
+
+        <main class="chat-main container-fluid pb-3 h-100 overflow-hidden">
+            <div class="row h-100 g-3">
+                <!-- Sidebar -->
+                <div class="col-lg-4 col-md-5 d-none d-md-flex flex-column h-100 overflow-auto pb-5">
+                    <div class="goal-sidebar glass-card p-4">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <span class="bi bi-star-fill text-warning"></span>
+                            <h2 class="h6 mb-0 fw-bold uppercase-title">Tvůj úkol</h2>
+                        </div>
+                        <div class="goal-box p-3 rounded-4 bg-white border border-light mb-4 shadow-sm">
+                            <p class="mb-0 small text-dark leading-relaxed">@group?.GoalDescription</p>
+                        </div>
+
+                        <div class="progress-section mt-4">
+                            <div class="d-flex justify-content-between align-items-end mb-2">
+                                <span class="small fw-bold text-muted">Tvůj pokrok</span>
+                                <span class="h4 mb-0 text-primary fw-700">@((int)(student.ProgressLog?.Percentage ?? 0))%</span>
+                            </div>
+                            
+                            @if (group?.GoalType == GoalType.Boolean)
+                            {
+                                <div class="boolean-goal text-center p-3 rounded-4 @(student.ProgressLog?.IsCompleted == true ? "bg-success-light border-success" : "bg-light border") border-2 transition-all">
+                                    @if (student.ProgressLog?.IsCompleted == true)
+                                    {
+                                        <div class="text-success scale-up"><span class="bi bi-check-circle-fill h1"></span></div>
+                                        <div class="fw-bold text-success">Skvělá práce! Splněno!</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted opacity-50"><span class="bi bi-circle h1"></span></div>
+                                        <div class="text-muted fw-medium">Zatím se pracuje...</div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="progress mb-2 shadow-xs" style="height: 12px; border-radius: 10px;">
+                                    <div class="progress-bar @(student.ProgressLog?.IsCompleted == true ? "bg-success" : "bg-primary") progress-bar-striped progress-bar-animated" 
+                                         role="progressbar" 
+                                         style="width: @(student.ProgressLog?.Percentage ?? 0)%" 
+                                         aria-valuenow="@(student.ProgressLog?.Percentage ?? 0)" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <div class="text-center x-small text-muted">
+                                    Dosáhl jsi <strong>@(student.ProgressLog?.CurrentValue ?? 0)</strong> z <strong>@(group?.TargetValue ?? 0)</strong>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mt-4 pt-4 border-top">
+                            <button class="btn w-100 @(isNeedsHelp ? "btn-danger" : "btn-outline-danger") d-flex align-items-center justify-content-center gap-2" @onclick="ToggleHelp">
+                                <span class="bi @(isNeedsHelp ? "bi-heart-pulse-fill flash-anim" : "bi-question-circle")"></span>
+                                @(isNeedsHelp ? "Čekám na pomoc..." : "Potřebuji pomoct")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Area -->
+                <div class="col-lg-8 col-md-7 d-flex flex-column h-100 overflow-hidden pb-5">
+                    <div class="messages-area glass-card d-flex flex-column h-100 overflow-hidden">
+                        <div id="chatLines" class="messages-list flex-grow-1 p-3 overflow-auto d-flex flex-column gap-3">
+                            @foreach (var msg in messages)
+                            {
+                                var isOwn = msg.StudentId == student.Id;
+                                <div class="message-row d-flex @(isOwn ? "justify-content-end" : "justify-content-start") fade-in">
+                                    <div class="message-bubble @(msg.IsFromTeacher ? "teacher" : (isOwn ? "own" : (msg.StudentId == 0 ? "system" : "other"))) @(msg.IsProgressContribution ? "contribution" : "") @(msg.Metadata?.IsRelevant == false ? "is-irrelevant" : "") shadow-xs">
+                                        @if (!isOwn && msg.StudentId != 0)
+                                        {
+                                            <div class="bubble-sender d-flex align-items-center gap-1">
+                                                @if (msg.IsFromTeacher)
+                                                {
+                                                    <span class="bi bi-mortarboard-fill text-primary"></span>
+                                                }
+                                                @msg.Nickname
+                                            </div>
+                                        }
+                                        
+                                        @if (msg.IsFromTeacher)
+                                        {
+                                            <div class="teacher-tag"><span class="bi bi-stars"></span> Zpráva od učitele</div>
+                                        }
+
+                                        <div class="bubble-content">
+                                            @if (msg.Content.Contains("$") || msg.Content.Contains("\\"))
+                                            {
+                                                <div class="math-container">@((MarkupString)msg.Content)</div>
+                                            }
+                                            else
+                                            {
+                                                @msg.Content
+                                            }
+                                        </div>
+
+                                        <div class="bubble-footer d-flex justify-content-between align-items-center gap-3">
+                                            @if (msg.IsProgressContribution)
+                                            {
+                                                <span class="contribution-badge"><span class="bi bi-patch-check-fill"></span> Pokrok</span>
+                                            }
+                                            <span class="bubble-time">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
+                                        </div>
+
+                                        @if (msg.Metadata != null && !string.IsNullOrEmpty(msg.Metadata.StudentFeedback))
+                                        {
+                                            <div class="ai-feedback mt-2 border-top pt-1">
+                                                <span class="bi bi-info-circle"></span> @msg.Metadata.StudentFeedback
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        
+                        <div class="input-area p-3 bg-white border-top shadow-lg" style="z-index: 10;">
+                            @if (showInactivityWarning)
+                            {
+                                <div class="alert alert-warning py-1 px-3 mb-2 rounded-3 border-0 x-small text-center fade-in">
+                                    <span class="bi bi-clock-history"></span> Pár minut už jsi nic nenapsal(a). Pracuješ na úkolu?
+                                </div>
+                            }
+                            <div class="d-flex gap-2 align-items-end">
+                                <button class="btn btn-light rounded-circle shadow-xs" @onclick="StartVoice" title="Diktovat" style="width: 42px; height: 42px; padding: 0;">
+                                    <span class="bi bi-mic-fill @(isListening ? "text-danger scale-up" : "text-primary")"></span>
+                                </button>
+                                <div class="flex-grow-1">
+                                    <textarea id="chatInput" @bind="newMessage" @bind:event="oninput" @onkeydown="@HandleKeyDown"
+                                              class="form-control border-0 bg-light py-2" rows="1" 
+                                              placeholder="Napiš své řešení..."
+                                              style="resize: none; border-radius: 12px;"></textarea>
+                                </div>
+                                <button class="btn btn-primary rounded-circle shadow-sm" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(newMessage))" style="width: 42px; height: 42px; padding: 0;">
+                                    <span class="bi bi-send-fill"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-</div>
+}
 
 @code {
     [Parameter] public int GroupId { get; set; }
@@ -138,6 +198,7 @@
     private bool isListening = false;
     private HubConnection? hubConnection;
     private DotNetObjectReference<Chat>? objRefContent;
+    private bool isLoading = true;
 
     // Watchdog
     private System.Threading.Timer? inactivityTimer;
@@ -155,8 +216,8 @@
     {
         return status switch
         {
-            StudentStatus.Active => "bg-success text-white",
-            StudentStatus.NeedHelp => "bg-danger text-white",
+            StudentStatus.Active => "bg-primary text-white",
+            StudentStatus.NeedHelp => "bg-danger text-white flash-anim",
             StudentStatus.Inactive => "bg-secondary text-white",
             _ => "bg-info text-white"
         };
@@ -206,6 +267,8 @@
                 Content = m.Content,
                 Timestamp = m.Timestamp,
                 IsProgressContribution = m.IsProgressContribution,
+                IsFromTeacher = m.IsFromTeacher,
+                Nickname = m.StudentId == 0 ? "Systém" : (m.IsFromTeacher ? "Učitel" : m.Student?.Nickname),
                 Student = m.Student,
                 IsSystemMessage = m.IsSystemMessage
             }).ToList();
@@ -234,7 +297,7 @@
                     Nickname = senderNickname
                 });
 
-                if (sid == student.Id)
+                if (sid == student?.Id)
                 {
                     ResetWatchdog();
                 }
@@ -257,13 +320,14 @@
             hubConnection.On<int, int>("ProgressUpdated", (sid, val) => {
                 if (student != null && sid == student.Id && student.ProgressLog != null) {
                     student.ProgressLog.CurrentValue = val;
-                    StateHasChanged();
+                    InvokeAsync(StateHasChanged);
                 }
             });
 
             hubConnection.On<int, StudentStatus>("StatusChanged", (sid, status) => {
                 if (student != null && sid == student.Id) {
                     student.Status = status;
+                    isNeedsHelp = status == StudentStatus.NeedHelp;
                     InvokeAsync(StateHasChanged);
                 }
             });
@@ -281,6 +345,7 @@
 
             StartWatchdog();
             
+            isLoading = false;
             StateHasChanged();
             ScrollToBottom();
         }
@@ -308,9 +373,7 @@
         {
             if (hubConnection?.State == HubConnectionState.Connected)
             {
-                await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, student?.Id, false); 
-                // We use SignalNeedHelp to set status, but we need a status for Inactive.
-                // For now, let's just make it call a dedicated hub method if we add it, othewise we'll stick to a status update.
+                // await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, student?.Id, false); 
             }
         }
 
@@ -369,6 +432,7 @@
     public async ValueTask DisposeAsync()
     {
         objRefContent?.Dispose();
+        inactivityTimer?.Dispose();
         if (hubConnection is not null)
         {
             await hubConnection.DisposeAsync();
@@ -378,124 +442,138 @@
 
 <style>
     .chat-wrapper {
-        display: flex;
-        flex-direction: column;
         height: 100vh;
-        max-height: 100vh;
-        overflow: hidden;
-    }
-    .chat-header {
-        background: #1b6ec2;
-        color: white;
-        padding: 0.4rem 0;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        z-index: 10;
-    }
-    .chat-messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 0.75rem;
-        background: #f0f2f5;
         display: flex;
         flex-direction: column;
-        gap: 0.4rem;
+        background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
     }
-    .message {
-        max-width: 80%;
-        padding: 0.5rem 1rem;
-        border-radius: 1rem;
-        background: white;
-        align-self: flex-start;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        position: relative;
+
+    .chat-header {
+        z-index: 100;
     }
-    .message.own {
-        align-self: flex-end;
-        background: #0084ff;
-        color: white;
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
     }
-    .message.system {
-        align-self: center;
-        background: #e9ecef;
-        color: #495057;
-        font-size: 0.8rem;
-        border-radius: 0.5rem;
-    }
-    .message.contribution {
-        border: 2px solid #28a745;
-        background: #f8fff9;
-    }
-    .message.own.contribution {
-        background: #0084ff;
-        border-color: #7fff00;
-    }
-    .message.is-irrelevant {
-        opacity: 0.8;
-        border: 1px dashed #dc3545;
-    }
-    .contribution-badge {
-        font-size: 0.7rem;
-        color: #28a745;
-        font-weight: bold;
-        margin-top: 0.3rem;
-        display: flex;
-        align-items: center;
-        gap: 0.2rem;
-    }
-    .irrelevant-badge {
-        font-size: 0.7rem;
-        color: #dc3545;
-        margin-top: 0.3rem;
-        display: flex;
-        align-items: center;
-        gap: 0.2rem;
-    }
-    .ai-feedback {
+    .status-dot.connected { background-color: var(--secondary); box-shadow: 0 0 5px var(--secondary); }
+    .status-dot.disconnected { background-color: #ef4444; }
+
+    .uppercase-title {
         font-size: 0.75rem;
-        color: #1b6ec2;
-        font-style: italic;
-        margin-top: 0.4rem;
-        padding-top: 0.3rem;
-        border-top: 1px solid rgba(0,0,0,0.05);
-    }
-    .message.own .ai-feedback {
-        color: #e0f0ff;
-        border-top-color: rgba(255,255,255,0.2);
-    }
-    .message.own .irrelevant-badge {
-        color: #ffc2c2;
-    }
-    .message.own .contribution-badge {
-        color: #7fff00;
-    }
-    .message .sender {
-        font-size: 0.7rem;
-        font-weight: bold;
-        margin-bottom: 0.2rem;
-        opacity: 0.8;
-    }
-    .message .time {
-        font-size: 0.6rem;
-        text-align: right;
-        margin-top: 0.2rem;
-        opacity: 0.6;
-    }
-    .message.teacher {
-        align-self: flex-start;
-        background: #eef7ff;
-        border-left: 4px solid #0d6efd;
-        color: #084298;
-    }
-    .teacher-tag {
-        font-size: 0.6rem;
-        font-weight: bold;
         text-transform: uppercase;
-        margin-bottom: 2px;
-        color: #0d6efd;
+        letter-spacing: 0.05em;
+        color: var(--text-light);
     }
-    .chat-input-area {
+
+    .messages-list {
+        background: transparent;
+        scrollbar-gutter: stable;
+    }
+
+    .message-bubble {
+        max-width: 85%;
+        padding: 0.75rem 1rem;
+        border-radius: 1.25rem;
+        position: relative;
+        font-size: 0.925rem;
+        line-height: 1.4;
+    }
+
+    .message-bubble.own {
+        background: var(--primary);
+        color: white;
+        border-bottom-right-radius: 0.25rem;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+    }
+
+    .message-bubble.other {
         background: white;
-        border-top: 1px solid #dee2e6;
-        padding-bottom: env(safe-area-inset-bottom);
+        color: var(--text-main);
+        border-bottom-left-radius: 0.25rem;
+        box-shadow: var(--shadow-sm);
     }
+
+    .message-bubble.teacher {
+        background: #f0f7ff;
+        border: 1px solid #bae6fd;
+        border-bottom-left-radius: 0.25rem;
+        color: #0369a1;
+    }
+
+    .message-bubble.system {
+        background: rgba(0,0,0,0.05);
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        border-radius: 0.75rem;
+        text-align: center;
+        align-self: center;
+        padding: 0.4rem 1rem;
+    }
+
+    .message-bubble.contribution {
+        border: 2px solid var(--secondary);
+    }
+
+    .bubble-sender {
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+        opacity: 0.9;
+    }
+
+    .teacher-tag {
+        font-size: 0.65rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: var(--primary);
+        margin-bottom: 0.25rem;
+    }
+
+    .bubble-footer {
+        margin-top: 0.4rem;
+        font-size: 0.7rem;
+        opacity: 0.7;
+    }
+
+    .bubble-time {
+        font-weight: 500;
+    }
+
+    .contribution-badge {
+        color: var(--secondary);
+        font-weight: 700;
+        font-size: 0.65rem;
+        display: flex;
+        align-items: center;
+        gap: 0.2rem;
+    }
+
+    .own .contribution-badge { color: #86efac; }
+    .own .bubble-footer { opacity: 0.8; }
+
+    .ai-feedback {
+        font-size: 0.8rem;
+        font-style: italic;
+        color: var(--primary);
+    }
+
+    .is-irrelevant {
+        opacity: 0.6;
+        filter: grayscale(0.5);
+    }
+
+    .bg-success-light { background-color: #f0fdf4; }
+
+    .scale-up {
+        animation: scaleUp 0.3s ease-out;
+    }
+    @@keyframes scaleUp {
+        from { transform: scale(0.8); }
+        to { transform: scale(1); }
+    }
+
+    .fw-700 { font-weight: 700; }
 </style>

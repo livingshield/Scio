@@ -14,253 +14,249 @@
 @implements IAsyncDisposable
 @using System.Net.Http
 
-<PageTitle>Sledování výuky - Scio</PageTitle>
+<PageTitle>@group?.Name - Monitoring</PageTitle>
 
-<div class="container-fluid mt-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="">Dashboard</a></li>
-            <li class="breadcrumb-item active">@group?.Name</li>
-        </ol>
-    </nav>
+<div class="dashboard-wrapper pb-5">
+    <div class="container-fluid pt-4">
+        <!-- Header Section -->
+        <div class="dashboard-header glass-card p-4 mb-4 fade-in">
+            <div class="row align-items-center g-3">
+                <div class="col-lg-6">
+                    <nav aria-label="breadcrumb" class="mb-2">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="" class="text-primary fw-medium">Dashboard</a></li>
+                            <li class="breadcrumb-item active">@group?.Name</li>
+                        </ol>
+                    </nav>
+                    <h1 class="h2 fw-bold mb-1">@group?.Name</h1>
+                    <p class="text-muted mb-0"><span class="badge bg-primary-light text-primary me-2">Cíl</span> @group?.GoalDescription</p>
+                </div>
+                <div class="col-lg-6">
+                    <div class="d-flex flex-wrap justify-content-lg-end align-items-center gap-4">
+                        <div class="invite-info text-lg-end">
+                            <div class="small text-muted fw-bold uppercase-title mb-1">Kód pro studenty</div>
+                            <div class="d-flex align-items-center gap-2 justify-content-lg-end">
+                                <span class="h3 mb-0 fw-800 text-primary">@group?.InviteCode</span>
+                                <button class="btn btn-primary-light btn-sm" @onclick="ShowEmailModal" title="Pozvat e-mailem">
+                                    <span class="bi bi-person-plus-fill"></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="qr-box glass-card p-2 bg-white" style="cursor: pointer;" @onclick="ShowEmailModal">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=@(Uri.EscapeDataString(NavigationManager.BaseUri + "join/" + group?.InviteCode))" 
+                                 alt="QR" style="width: 64px; height: 64px;" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div>
-                <h1 class="h3 mb-1">@group?.Name</h1>
-                <p class="text-muted mb-0"><strong>Cíl:</strong> @group?.GoalDescription</p>
+        @if (isLoading)
+        {
+            <div class="text-center py-5 fade-in">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+                <div class="mt-3 text-muted">Načítám data ze třídy...</div>
             </div>
-            <AuthorizeView>
-                <Authorized>
-                    <span class="badge bg-light text-dark border py-2 px-3">
-                        <span class="bi bi-person-badge mr-1"></span> Učíte: <strong>@context.User.Identity?.Name</strong>
-                    </span>
-                </Authorized>
-            </AuthorizeView>
-        </div>
-        <div class="text-end d-flex align-items-center gap-3">
-            <div>
-                <div class="h5 mb-0">Kod pro studenty: <span class="badge bg-primary fs-5">@group?.InviteCode</span></div>
-                <div class="small text-muted mb-2">Aktivní monitoring probíhá</div>
-                <button class="btn btn-outline-primary btn-sm px-3" @onclick="ShowEmailModal">
-                    <span class="bi bi-envelope-plus"></span> Odeslat pozvánku e-mailem
-                </button>
-            </div>
-            <div class="qr-container bg-white p-1 border rounded shadow-sm">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=@(Uri.EscapeDataString(NavigationManager.BaseUri + "join/" + group?.InviteCode))" 
-                     alt="QR Code" style="width: 80px; height: 80px;" />
-            </div>
-        </div>
-    </div>
-
-    @if (isLoading)
-    {
-        <div class="text-center py-5">
-            <div class="spinner-border" role="status"></div>
-        </div>
-    }
-    else
-    {
-        <div class="row g-4">
-            <div class="@(selectedStudentId == null ? "col-12" : "col-md-7 col-lg-8")">
-                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-3">
-                    @foreach (var student in students.Values.OrderBy(s => s.Nickname))
-                    {
-                        <div class="col">
-                            <div class="card h-100 student-monitor-card @(student.Status == StudentStatus.NeedHelp ? "border-danger bg-light-danger" : "") @(selectedStudentId == student.Id ? "border-primary shadow" : "")"
-                                 @onclick="() => SelectStudent(student.Id)" style="cursor: pointer;">
-                                <div class="card-body p-3">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 class="card-title mb-0 text-truncate" style="max-width: 120px;" title="@student.Nickname">@student.Nickname</h6>
+        }
+        else
+        {
+            <div class="row g-4 h-100">
+                <!-- Students Grid -->
+                <div class="@(selectedStudentId == null ? "col-12" : "col-md-7 col-lg-8") transition-all">
+                    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-3">
+                        @foreach (var student in students.Values.OrderBy(s => s.Nickname))
+                        {
+                            <div class="col fade-in">
+                                <div class="glass-card glass-card-hover h-100 p-3 student-card @(student.Status == StudentStatus.NeedHelp ? "border-danger active-help" : "") @(selectedStudentId == student.Id ? "border-primary ring-2" : "")"
+                                     @onclick="() => SelectStudent(student.Id)" style="cursor: pointer;">
+                                    
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <div class="student-avatar bg-light-blue rounded-circle d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                                            <span class="bi bi-person-fill text-primary"></span>
+                                        </div>
                                         <span class="badge @GetStatusBadgeClass(student.Status)">
                                             @statusLabels[student.Status]
                                         </span>
                                     </div>
 
-                                    @if (group?.GoalType == GoalType.Boolean)
+                                    <h6 class="fw-bold mb-3 text-truncate" title="@student.Nickname">@student.Nickname</h6>
+
+                                    <div class="student-progress mb-3">
+                                        @{
+                                            var pct = student.ProgressLog?.Percentage ?? 0;
+                                            var isDone = student.ProgressLog?.IsCompleted == true;
+                                        }
+                                        <div class="d-flex justify-content-between align-items-center mb-1 x-small fw-bold">
+                                            <span class="text-muted">Pokrok</span>
+                                            <span class="@(isDone ? "text-success" : "text-primary")">@((int)pct)%</span>
+                                        </div>
+                                        <div class="progress shadow-xs" style="height: 8px;">
+                                            <div class="progress-bar @(isDone ? "bg-success" : "bg-primary")" 
+                                                 style="width: @pct%"></div>
+                                        </div>
+                                    </div>
+
+                                    @if (student.Status == StudentStatus.NeedHelp)
                                     {
-                                        @if (student.ProgressLog?.IsCompleted == true)
+                                        <div class="help-action mt-auto pt-2 border-top d-flex gap-2">
+                                            <button class="btn btn-success btn-sm flex-grow-1 py-1" @onclick:stopPropagation="true" @onclick="() => ResolveHelp(student.Id)">
+                                                <span class="bi bi-check2"></span> Vyřešit
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm px-2" title="Smazat studenta" @onclick:stopPropagation="true" @onclick="() => RemoveStudent(student.Id)">
+                                                <span class="bi bi-trash"></span>
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (!students.Any())
+                    {
+                        <div class="text-center py-5 glass-card bg-white mt-4 border-dashed">
+                            <div class="bi bi-people h1 text-muted opacity-25 mb-3"></div>
+                            <h4 class="text-muted fw-light">Čekáme na první žáky...</h4>
+                            <p class="text-muted small">Sdílejte kód <strong>@group?.InviteCode</strong></p>
+                        </div>
+                    }
+                </div>
+
+                <!-- Sidebar Detail -->
+                @if (selectedStudentId != null && students.TryGetValue(selectedStudentId.Value, out var selStudent))
+                {
+                    <div class="col-md-5 col-lg-4 fade-in">
+                        <div class="glass-card sticky-top d-flex flex-column h-screen-80 shadow-lg border-primary-light" style="top: 1rem;">
+                            <div class="p-4 border-bottom bg-white rounded-top-4">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                                            <span class="bi bi-person-fill h5 mb-0"></span>
+                                        </div>
+                                        <div>
+                                            <h5 class="fw-bold mb-0">@selStudent.Nickname</h5>
+                                            <span class="x-small text-muted">@GetLastActivityText(selStudent.LastActivityAt)</span>
+                                        </div>
+                                    </div>
+                                    <button class="btn-close" @onclick="() => selectedStudentId = null"></button>
+                                </div>
+                                <div class="mt-3 d-flex gap-2">
+                                    <button class="btn btn-outline-danger btn-sm flex-grow-1" @onclick="() => RemoveStudent(selStudent.Id)">
+                                        <span class="bi bi-trash me-1"></span> Odstranit
+                                    </button>
+                                    @if (selStudent.Status == StudentStatus.NeedHelp)
+                                    {
+                                        <button class="btn btn-success btn-sm flex-grow-1" @onclick="() => ResolveHelp(selStudent.Id)">
+                                            <span class="bi bi-check2-circle me-1"></span> Vyřešit pomoc
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="flex-grow-1 overflow-auto p-3">
+                                <div class="small fw-bold text-muted uppercase-title mb-3">Log komunikace</div>
+                                <div class="timeline d-flex flex-column gap-3">
+                                    @{
+                                        var studentMessages = allMessages.Where(m => m.StudentId == selStudent.Id).OrderByDescending(m => m.Timestamp);
+                                        if (!studentMessages.Any())
                                         {
-                                            <div class="text-center mb-2">
-                                                <span class="text-success fs-3">✔</span>
-                                                <div class="x-small fw-bold text-success">Splněno</div>
+                                            <div class="text-center py-5 text-muted opacity-50 small font-italic">
+                                                Žádná zpráva k zobrazení.
                                             </div>
                                         }
                                         else
                                         {
-                                            <div class="text-center mb-2">
-                                                <span class="text-secondary fs-3">☐</span>
-                                                <div class="x-small text-muted">Nesplněno</div>
-                                            </div>
+                                            @foreach (var m in studentMessages)
+                                            {
+                                                <div class="timeline-item glass-card p-3 @(m.IsProgressContribution ? "border-success bg-success-light" : (m.IsFromTeacher ? "border-primary bg-primary-light" : "bg-white"))">
+                                                    <div class="d-flex justify-content-between mb-2">
+                                                        <span class="x-small fw-bold">
+                                                            @if (m.IsFromTeacher)
+                                                            {
+                                                                <span class="text-primary"><span class="bi bi-person-workspace"></span> Vy (Učitel)</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="text-muted"><span class="bi bi-person"></span> Student</span>
+                                                            }
+                                                        </span>
+                                                        <span class="x-small text-muted">@m.Timestamp.ToLocalTime().ToString("HH:mm")</span>
+                                                    </div>
+                                                    <div class="small mb-2">@m.Content</div>
+                                                    <div class="d-flex justify-content-end">
+                                                        @if (m.IsProgressContribution)
+                                                        {
+                                                            <span class="badge bg-success py-1"><span class="bi bi-check-circle"></span> Uznáno</span>
+                                                        }
+                                                        else if (!m.IsFromTeacher)
+                                                        {
+                                                            <button class="btn btn-xs btn-outline-success" @onclick="() => ApproveMessage(m.Id)">
+                                                                <span class="bi bi-plus-circle"></span> Uznat jako pokrok
+                                                            </button>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
                                         }
                                     }
-                                    else
-                                    {
-                                        <div class="progress mb-2" style="height: 12px;">
-                                            <div class="progress-bar @(student.Status == StudentStatus.Completed ? "bg-success" : "bg-primary")" 
-                                                 role="progressbar" 
-                                                 style="width: @(student.ProgressLog?.Percentage ?? 0)%"
-                                                 aria-valuenow="@(student.ProgressLog?.Percentage ?? 0)" 
-                                                 aria-valuemin="0" aria-valuemax="100">
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="d-flex justify-content-between x-small">
-                                            <span>Pokrok: <strong>@(student.ProgressLog?.CurrentValue ?? 0) / @(group?.TargetValue ?? 0)</strong></span>
-                                            <span class="text-muted">@GetLastActivityText(student.LastActivityAt)</span>
-                                        </div>
-                                    }
                                 </div>
-                                @if (student.Status == StudentStatus.NeedHelp)
-                                {
-                                    <div class="card-footer bg-danger text-white py-1 text-center x-small fw-bold border-top-0 d-flex align-items-center justify-content-between px-2">
-                                        <div class="d-flex align-items-center gap-1">
-                                            <span>POMOC!</span>
-                                            <button class="btn btn-sm btn-light py-0 px-1" style="font-size: 0.65rem;" @onclick:stopPropagation="true" @onclick="() => ResolveHelp(student.Id)">
-                                                ✔ OK
-                                            </button>
-                                        </div>
-                                        <button class="btn btn-sm btn-outline-light py-0 px-1 border-0" title="Odstranit studenta" @onclick:stopPropagation="true" @onclick="() => RemoveStudent(student.Id)">
-                                            <span class="bi bi-trash"></span>
-                                        </button>
-                                    </div>
-                                }
                             </div>
-                        </div>
-                    }
-                </div>
 
-                @if (!students.Any())
-                {
-                    <div class="text-center py-5 border rounded bg-light mt-4 px-3">
-                        <div class="h4 text-muted mb-3">Zatím se nepřipojili žádní studenti</div>
-                        <p class="mb-0">Sdílejte kód <strong>@group?.InviteCode</strong> nebo QR kód výše.</p>
-                        <div class="mt-3">
-                            <small>Adresa pro připojení: <br class="d-md-none" /> <code>@(NavigationManager.BaseUri)join/@group?.InviteCode</code></small>
+                            <div class="p-3 border-top bg-light rounded-bottom-4">
+                                <div class="input-group">
+                                    <input type="text" class="form-control border-0 shadow-xs" @bind="teacherMessageText" 
+                                           @bind:event="oninput" @onkeydown="@HandleTeacherKey"
+                                           placeholder="Zpráva studentovi..." />
+                                    <button class="btn btn-primary" @onclick="SendTeacherMessage" 
+                                            disabled="@(string.IsNullOrWhiteSpace(teacherMessageText))">
+                                        <span class="bi bi-send"></span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 }
             </div>
-
-            @if (selectedStudentId != null && students.TryGetValue(selectedStudentId.Value, out var selStudent))
-            {
-                <div class="col-md-5 col-lg-4">
-                    <div class="card shadow-sm sticky-top" style="top: 1rem; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
-                        <div class="card-header bg-white">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <h5 class="mb-0 text-truncate">Detail: @selStudent.Nickname</h5>
-                                <button class="btn-close" @onclick="() => selectedStudentId = null"></button>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-outline-danger btn-sm py-0 flex-grow-1" @onclick="() => RemoveStudent(selStudent.Id)" title="Odstranit studenta ze skupiny">
-                                    <span class="bi bi-trash"></span> Odstranit studenta
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body overflow-auto p-0">
-                            <div class="p-3 bg-light border-bottom">
-                                <div class="small fw-bold text-muted mb-1">Historie komunikace:</div>
-                            </div>
-                            <div class="p-3 border-bottom bg-white">
-                                <div class="input-group input-group-sm">
-                                    <input type="text" class="form-control" @bind="teacherMessageText" 
-                                           @bind:event="oninput" @onkeydown="@HandleTeacherKey"
-                                           placeholder="Napište studentovi zprávu..." />
-                                    <button class="btn btn-primary" type="button" @onclick="SendTeacherMessage" 
-                                            disabled="@(string.IsNullOrWhiteSpace(teacherMessageText))">
-                                        Odeslat
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="p-3">
-                                @{
-                                    var studentMessages = allMessages.Where(m => m.StudentId == selStudent.Id).OrderByDescending(m => m.Timestamp);
-                                    if (!studentMessages.Any())
-                                    {
-                                        <div class="text-center py-4 text-muted small">
-                                            Zatím žádné zprávy od tohoto studenta.
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <div class="list-group list-group-flush">
-                                            @foreach (var m in studentMessages)
-                                            {
-                                                <div class="list-group-item @(m.IsProgressContribution ? "border-start border-4 border-success bg-white shadow-xs" : (m.IsFromTeacher ? "bg-light-blue border-start border-4 border-primary" : "bg-transparent")) mb-2 rounded border-light">
-                                                    <div class="d-flex justify-content-between mb-1 gap-2">
-                                                        @if (m.IsProgressContribution)
-                                                        {
-                                                            <span class="badge bg-success py-0" style="height: fit-content;">Uznaný pokrok</span>
-                                                        }
-                                                        else if (m.IsFromTeacher)
-                                                        {
-                                                            <span class="badge bg-primary py-0" style="height: fit-content;">Vy (Učitel)</span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <button class="btn btn-xs btn-outline-success py-0 border-0" @onclick="() => ApproveMessage(m.Id)" title="Klikněte pro uznání pokroku">
-                                                                <span class="bi bi-plus-circle"></span> Uznat jako pokrok
-                                                            </button>
-                                                        }
-                                                        <small class="text-muted flex-shrink-0">@m.Timestamp.ToLocalTime().ToString("HH:mm")</small>
-                                                    </div>
-                                                    <div class="small text-break @(m.IsFromTeacher ? "fst-italic" : "")">@m.Content</div>
-                                                </div>
-                                            }
-                                        </div>
-                                    }
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
-    }
+        }
+    </div>
 </div>
 
 @if (isEmailModalVisible)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1050;">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content shadow-lg border-0">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title"><span class="bi bi-send-fill mr-2"></span> Odeslat pozvánku studentům</h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="HideEmailModal"></button>
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 1050;">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="glass-card modal-content border-0 p-2 overflow-hidden">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="fw-bold mb-0 text-primary">Hromadná pozvánka</h5>
+                    <button type="button" class="btn-close" @onclick="HideEmailModal"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">E-mailové adresy studentů (oddělujte středníkem `;` )</label>
-                        <input type="text" class="form-control" @bind="emailRecipients" placeholder="jan@skola.cz; petr@skola.cz" />
-                        <div class="form-text">Adresy oddělte středníkem. QR kód bude automaticky přiložen jako soubor .jpg.</div>
+                        <label class="form-label x-small fw-bold text-muted uppercase-title">E-maily studentů (středník `;` )</label>
+                        <input type="text" class="form-control" @bind="emailRecipients" placeholder="např. zaci@skola.cz; petr@seznam.cz" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Předmět e-mailu</label>
-                        <input type="text" class="form-control" @bind="emailSubject" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Text zprávy pro studenty</label>
-                        <textarea class="form-control" @bind="emailBody" rows="8" style="background: #ffffff; border: 1px solid #dee2e6;" placeholder="Např.: Ahoj, posílám pozvánku k dnešnímu úkolu."></textarea>
-                        <div class="form-text">Zadejte prostý text. Odkaz na úkol a formátování budou doplněny automaticky.</div>
+                        <label class="form-label x-small fw-bold text-muted uppercase-title">Text pozvánky</label>
+                        <textarea class="form-control bg-light" @bind="emailBody" rows="6" style="resize: none;"></textarea>
                     </div>
                     
                     @if (!string.IsNullOrEmpty(emailStatus))
                     {
-                        <div class="alert @(emailStatus.StartsWith("Chyba") ? "alert-danger" : "alert-success") py-2 mt-3">
-                            <span class="bi @(emailStatus.StartsWith("Chyba") ? "bi-exclamation-octagon" : "bi-check-circle")"></span> @emailStatus
+                        <div class="alert @(emailStatus.StartsWith("Chyba") ? "alert-danger" : "alert-success") py-2 rounded-3 fade-in">
+                            <span class="bi @(emailStatus.StartsWith("Chyba") ? "bi-exclamation-octagon" : "bi-check-circle") me-2"></span> @emailStatus
                         </div>
                     }
                 </div>
-                <div class="modal-footer bg-light p-3">
-                    <button type="button" class="btn btn-secondary px-4" @onclick="HideEmailModal" disabled="@isSendingEmail">Zavřít</button>
-                    <button type="button" class="btn btn-primary px-4" @onclick="SendEmails" disabled="@(string.IsNullOrEmpty(emailRecipients) || isSendingEmail)">
+                <div class="modal-footer border-0 pt-0 pb-3">
+                    <button type="button" class="btn btn-light px-4" @onclick="HideEmailModal" disabled="@isSendingEmail">Zavřít</button>
+                    <button type="button" class="btn btn-primary px-5 shadow-sm" @onclick="SendEmails" disabled="@(string.IsNullOrEmpty(emailRecipients) || isSendingEmail)">
                         @if (isSendingEmail)
                         {
-                            <span class="spinner-border spinner-border-sm mr-2" role="status"></span> <span>Odesílám...</span>
+                            <span class="spinner-border spinner-border-sm me-2"></span> <span>Odesílám...</span>
                         }
                         else
                         {
-                            <span class="bi bi-send"></span> <span>Odeslat vše</span>
+                            <span class="bi bi-send-fill me-2"></span> <span>Odeslat</span>
                         }
                     </button>
                 </div>
@@ -304,23 +300,21 @@
         {
             await hubConnection.InvokeAsync("SendTeacherMessage", GroupId, selectedStudentId.Value, teacherMessageText);
             teacherMessageText = "";
-            StateHasChanged();
+            InvokeAsync(StateHasChanged);
         }
     }
 
     private async Task RemoveStudent(int studentId)
     {
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Opravdu chcete odstranit studenta ze skupiny? Smažou se i jeho zprávy a pokrok.");
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Opravdu chcete odstranit studenta? Smažou se i jeho zprávy.");
         if (!confirmed) return;
 
         var success = await StudentService.DeleteStudentAsync(studentId);
         if (success)
         {
-            if (selectedStudentId == studentId)
-            {
-                selectedStudentId = null;
-            }
+            if (selectedStudentId == studentId) selectedStudentId = null;
             await RefreshStudents();
+            InvokeAsync(StateHasChanged);
         }
     }
 
@@ -353,45 +347,24 @@
         hubConnection.On<string>("UserJoined", async (nickname) =>
         {
             await RefreshStudents();
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         });
 
         hubConnection.On<int, int, string, DateTime, bool, bool, string, bool>("ReceiveMessage", async (mid, sid, content, time, isProgress, isRelevant, feedback, isFromTeacher) =>
         {
-            if (!students.ContainsKey(sid))
-            {
-                // New student message from someone not in our initial list
-                await RefreshStudents();
-            }
+            if (!students.ContainsKey(sid)) await RefreshStudents();
 
-            if (students.TryGetValue(sid, out var s))
-            {
-                s.LastActivityAt = DateTime.UtcNow;
-            }
+            if (students.TryGetValue(sid, out var s)) s.LastActivityAt = DateTime.UtcNow;
                 
-            // Deduplicate: check if message with this ID already exists
             if (!allMessages.Any(m => m.Id == mid && mid != 0))
             {
                 allMessages.Add(new Message { 
-                    Id = mid, 
-                    StudentId = sid, 
-                    Content = content, 
-                    Timestamp = time, 
-                    IsProgressContribution = isProgress,
-                    IsFromTeacher = isFromTeacher
+                    Id = mid, StudentId = sid, Content = content, Timestamp = time, 
+                    IsProgressContribution = isProgress, IsFromTeacher = isFromTeacher
                 });
             }
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         });
-
-        hubConnection.Reconnected += async (connectionId) =>
-        {
-            // Re-join group after network drop
-            if (hubConnection is not null)
-            {
-                await hubConnection.InvokeAsync("JoinGroup", GroupId, "", "", true);
-            }
-        };
 
         hubConnection.On<int, int>("MessageApproved", (mid, sid) =>
         {
@@ -399,7 +372,7 @@
             if (msg != null)
             {
                 msg.IsProgressContribution = true;
-                StateHasChanged();
+                InvokeAsync(StateHasChanged);
             }
         });
 
@@ -409,7 +382,7 @@
             {
                 s.ProgressLog.CurrentValue = val;
                 s.ProgressLog.IsCompleted = val >= (group?.TargetValue ?? 0);
-                StateHasChanged();
+                InvokeAsync(StateHasChanged);
             }
         });
 
@@ -418,7 +391,7 @@
             if (students.TryGetValue(sid, out var s))
             {
                 s.Status = status;
-                StateHasChanged();
+                InvokeAsync(StateHasChanged);
             }
         });
 
@@ -426,25 +399,13 @@
         await hubConnection.InvokeAsync("JoinGroup", GroupId, "", "", true);
     }
 
-    private void SelectStudent(int id)
-    {
-        selectedStudentId = id;
-    }
+    private void SelectStudent(int id) => selectedStudentId = id;
 
     private void ShowEmailModal()
     {
         emailStatus = "";
         emailSubject = $"Pozvánka ke spolupráci: {group?.Name}";
-        
-        emailBody = $@"Ahoj, připoj se do skupiny {group?.Name}!
-
-Právě jsem založil(a) novou aktivitu v aplikaci Scio. Tvým cílem je:
-{group?.GoalDescription}
-
-Do skupiny se připojíš kliknutím na odkaz níže nebo po naskenování QR kódu v příloze e-mailu.
-
-Těším se na tvou práci!
-Tvůj učitel";
+        emailBody = $"Ahoj, připoj se do skupiny {group?.Name}!\nTvé zadání: {group?.GoalDescription}\n\nTěším se na tvoji práci!\nUčitel";
         isEmailModalVisible = true;
     }
 
@@ -453,103 +414,31 @@ Tvůj učitel";
     private async Task SendEmails()
     {
         if (string.IsNullOrWhiteSpace(emailRecipients)) return;
-
-        isSendingEmail = true;
-        emailStatus = "";
-        StateHasChanged();
+        isSendingEmail = true; emailStatus = ""; StateHasChanged();
 
         try
         {
-            // Prepare QR code data
             var qrUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(NavigationManager.BaseUri + "join/" + group?.InviteCode)}";
-            byte[]? qrBytes = null;
-            
-            try 
-            {
-                qrBytes = await HttpClient.GetByteArrayAsync(qrUrl);
-            }
-            catch(Exception ex)
-            {
-                Console.WriteLine($"QR code download failed: {ex.Message}");
-            }
-
-            var printableBody = emailBody.Replace("\n", "<br />");
+            byte[]? qrBytes = await HttpClient.GetByteArrayAsync(qrUrl);
             var joinUrl = $"{NavigationManager.BaseUri}join/{group?.InviteCode}";
             
-            var htmlFinal = $@"<html>
-<body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
-    <div style='max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;'>
-        <h2 style='color: #0d6efd; border-bottom: 2px solid #0d6efd; padding-bottom: 10px;'>Pozvánka: {group?.Name}</h2>
-        <div style='margin: 20px 0;'>
-            {printableBody}
-        </div>
-        <div style='text-align: center; margin: 30px 0;'>
-            <a href='{joinUrl}' style='display: inline-block; padding: 12px 25px; background: #0d6efd; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;'>VSTOUPIT DO SKUPINY</a>
-        </div>
-        <p style='font-size: 0.9rem; color: #666;'>Odkaz: <a href='{joinUrl}'>{joinUrl}</a></p>
-        <p style='font-size: 0.8rem; color: #999; margin-top: 30px; border-top: 1px solid #eee; pt: 10px;'>Tento e-mail byl odeslán z aplikace Scio Monitoring.</p>
-    </div>
-</body>
-</html>";
+            var htmlFinal = $@"<html><body style='font-family: Arial; padding: 20px;'><h2>Dobrý den, posílám pozvánku.</h2><p>{emailBody.Replace("\n","<br/>")}</p><a href='{joinUrl}' style='padding: 10px; background: #4f46e5; color: white;'>PŘIPOJIT SE</a></body></html>";
 
-            await EmailService.SendEmailAsync(
-                emailRecipients, 
-                emailSubject, 
-                htmlFinal, 
-                $"pozvanka_qr_{group?.InviteCode}.jpg", 
-                qrBytes);
-            
-            emailStatus = "E-maily byly úspěšně odeslány všem studentům!";
-            await Task.Delay(2000);
-            HideEmailModal();
+            await EmailService.SendEmailAsync(emailRecipients, emailSubject, htmlFinal, $"qr_{group?.InviteCode}.jpg", qrBytes);
+            emailStatus = "Odesláno!"; await Task.Delay(1500); HideEmailModal();
         }
-        catch (Exception ex)
-        {
-            emailStatus = $"Chyba při odesílání: {ex.Message}";
-        }
-        finally
-        {
-            isSendingEmail = false;
-        }
-    }
-
-    private async Task MarkStatus(int studentId, StudentStatus status)
-    {
-        if (hubConnection is not null)
-        {
-            await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, studentId, status == StudentStatus.NeedHelp);
-            // This is a bit of a hack since SignalNeedHelp only takes bool. 
-            // In a real app we'd have a specialized "SetStatus" method.
-        }
+        catch (Exception ex) { emailStatus = $"Chyba: {ex.Message}"; }
+        finally { isSendingEmail = false; }
     }
 
     private async Task ApproveMessage(int messageId)
     {
-        if (hubConnection is not null)
-        {
-            await hubConnection.InvokeAsync("ApproveMessage", GroupId, messageId);
-            
-            // Local update for immediate feedback
-            var msg = allMessages.FirstOrDefault(m => m.Id == messageId);
-            if (msg != null)
-            {
-                msg.IsProgressContribution = true;
-                StateHasChanged();
-            }
-        }
+        if (hubConnection is not null) await hubConnection.InvokeAsync("ApproveMessage", GroupId, messageId);
     }
 
     private async Task ResolveHelp(int studentId)
     {
-        if (hubConnection is not null)
-        {
-            await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, studentId, false);
-            if (students.TryGetValue(studentId, out var s))
-            {
-                s.Status = StudentStatus.Active;
-                StateHasChanged();
-            }
-        }
+        if (hubConnection is not null) await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, studentId, false);
     }
 
     private async Task RefreshStudents()
@@ -557,57 +446,76 @@ Tvůj učitel";
         var updatedGroup = await GroupService.GetGroupByIdAsync(GroupId);
         if (updatedGroup != null)
         {
-            foreach (var s in updatedGroup.Students)
-            {
-                students[s.Id] = s;
-            }
+            foreach (var s in updatedGroup.Students) students[s.Id] = s;
         }
     }
 
     private string GetStatusBadgeClass(StudentStatus status) => status switch
     {
-        StudentStatus.Active => "bg-primary",
-        StudentStatus.NeedHelp => "bg-danger flash-anim",
-        StudentStatus.Inactive => "bg-warning text-dark",
-        StudentStatus.Completed => "bg-success",
+        StudentStatus.Active => "bg-primary-light text-primary",
+        StudentStatus.NeedHelp => "bg-light-danger text-danger flash-anim",
+        StudentStatus.Inactive => "bg-light text-muted border",
+        StudentStatus.Completed => "bg-success text-white",
         _ => "bg-secondary"
     };
 
     private string GetLastActivityText(DateTime lastActivity)
     {
         var diff = DateTime.UtcNow - lastActivity;
-        if (diff.TotalSeconds < 30) return "nyní";
-        if (diff.TotalSeconds < 60) return "před < 1m";
+        if (diff.TotalSeconds < 30) return "právě teď";
         return $"před {Math.Floor(diff.TotalMinutes)}m";
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (hubConnection is not null)
-        {
-            await hubConnection.DisposeAsync();
-        }
+        if (hubConnection is not null) await hubConnection.DisposeAsync();
     }
 }
 
 <style>
-    .student-monitor-card {
-        transition: all 0.2s ease-in-out;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    .dashboard-wrapper {
+        background-color: var(--background);
+        min-height: 100vh;
     }
-    .student-monitor-card:hover {
-        transform: scale(1.02);
+
+    .bg-primary-light { background-color: #eef2ff !important; }
+    .bg-success-light { background-color: #f0fdf4 !important; }
+
+    .uppercase-title {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 700;
     }
-    .bg-light-blue {
-        background-color: #f0f7ff;
+
+    .fw-800 { font-weight: 800; }
+    
+    .h-screen-80 { height: 85vh; }
+
+    .student-card {
+        border: 2px solid transparent;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
+    .active-help {
+        background-color: #fff1f2 !important;
+        box-shadow: 0 0 20px rgba(225, 29, 72, 0.1) !important;
+    }
+
+    .timeline-item {
+        margin-bottom: 0.5rem;
+        border-radius: 12px;
+    }
+
     .btn-xs {
-        padding: 0.1rem 0.3rem;
-        font-size: 0.75rem;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        border-radius: 6px;
     }
-    @@keyframes flash {
-        0% { opacity: 1; }
-        50% { opacity: 0.6; }
-        100% { opacity: 1; }
+
+    .ring-2 {
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1) !important;
     }
 </style>

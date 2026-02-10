@@ -8,119 +8,130 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavigationManager
 
-<PageTitle>Dashboard - Scio</PageTitle>
+<PageTitle>Moje skupiny - Scio</PageTitle>
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Moje skupiny</h1>
-        <button class="btn btn-primary" @onclick="ShowCreateModal">
-            <span class="bi bi-plus" aria-hidden="true"></span> Vytvořit skupinu
-        </button>
-    </div>
-
-    @if (isLoading)
-    {
-        <div class="text-center">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Načítám...</span>
+<div class="dashboard-wrapper min-vh-100 pb-5">
+    <div class="container pt-5">
+        <div class="d-flex justify-content-between align-items-center mb-5 fade-in">
+            <div>
+                <h1 class="h2 fw-800 mb-1 text-slate-900">Moje skupiny</h1>
+                <p class="text-muted mb-0">Správa vašich aktivních tříd a výuky</p>
             </div>
+            <button class="btn btn-primary px-4 py-2 shadow-sm d-flex align-items-center gap-2" @onclick="ShowCreateModal">
+                <span class="bi bi-plus-lg"></span>
+                <span class="fw-bold">Nová skupina</span>
+            </button>
         </div>
-    }
-    else if (groups == null || !groups.Any())
-    {
-        <div class="alert alert-info">
-            Zatím jste nevytvořili žádnou skupinu. Začněte kliknutím na tlačítko "Vytvořit skupinu".
-        </div>
-    }
-    else
-    {
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-            @foreach (var group in groups)
-            {
-                <div class="col">
-                    <div class="card h-100 shadow-sm group-card">
-                        <div class="card-body">
-                            <h5 class="card-title">@group.Name</h5>
-                            <p class="card-text text-muted small mb-2">
-                                <span class="bi bi-calendar3"></span> @group.CreatedAt.ToLocalTime().ToString("d. M. yyyy HH:mm")
-                            </p>
-                            <div class="mb-3">
-                                <strong>Cíl:</strong> @group.GoalDescription
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <span class="badge @(group.IsActive ? "bg-success" : "bg-secondary")">
-                                    @(group.IsActive ? "Aktivní" : "Archivováno")
-                                </span>
-                                <span class="text-primary fw-bold">Kód: @group.InviteCode</span>
+
+        @if (isLoading)
+        {
+            <div class="text-center py-5 fade-in">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+                <div class="mt-3 text-muted">Načítám seznam skupin...</div>
+            </div>
+        }
+        else if (groups == null || !groups.Any())
+        {
+            <div class="glass-card p-5 text-center fade-in bg-white border-dashed">
+                <div class="bi bi-journal-plus h1 text-muted opacity-25 mb-3"></div>
+                <h3 class="text-slate-800 fw-bold">Zatím žádné skupiny</h3>
+                <p class="text-muted mb-4">Vytvořte svou první skupinu a začněte sledovat pokrok studentů v reálném čase.</p>
+                <button class="btn btn-primary px-5" @onclick="ShowCreateModal">Založit první skupinu</button>
+            </div>
+        }
+        else
+        {
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                @foreach (var group in groups)
+                {
+                    <div class="col fade-in">
+                        <div class="glass-card glass-card-hover h-100 group-card overflow-hidden d-flex flex-column border-0 bg-white">
+                            <div class="p-4 flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div class="badge @(group.IsActive ? "bg-success-light text-success" : "bg-light text-muted") border-0 px-3 py-2 rounded-3 fw-bold">
+                                        <span class="bi bi-record-circle-fill me-1 @(group.IsActive ? "text-success" : "text-muted")"></span>
+                                        @(group.IsActive ? "Aktivní" : "Archiv")
+                                    </div>
+                                    <div class="small text-muted fw-bold x-small uppercase-title">
+                                        @group.CreatedAt.ToLocalTime().ToString("d. M. yyyy")
+                                    </div>
+                                </div>
+                                
+                                <h3 class="h5 fw-800 mb-2 text-slate-900">@group.Name</h3>
+                                <div class="goal-preview mb-4 p-3 bg-light rounded-4 border border-light">
+                                    <div class="x-small fw-bold text-muted uppercase-title mb-1">Cíl výuky</div>
+                                    <p class="small text-slate-700 mb-0 leading-relaxed text-truncate-3">@group.GoalDescription</p>
+                                </div>
+
+                                <div class="invite-strip d-flex align-items-center gap-3 p-2 bg-slate-50 rounded-3 mb-3">
+                                    <div class="qr-thumbnail glass-card p-1 bg-white shadow-xs">
+                                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=@(Uri.EscapeDataString(NavigationManager.BaseUri + "join/" + group.InviteCode))" 
+                                             alt="QR" style="width: 40px; height: 40px;" />
+                                    </div>
+                                    <div class="flex-grow-1 overflow-hidden">
+                                        <div class="x-small fw-bold text-muted uppercase-title">Kód skupiny</div>
+                                        <div class="fw-800 text-primary">@group.InviteCode</div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="d-flex align-items-center gap-2 border-top pt-3 mt-2">
-                                <div class="qr-preview bg-white p-1 border rounded shadow-xs">
-                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=@(Uri.EscapeDataString(NavigationManager.BaseUri + "join/" + group.InviteCode))" 
-                                         alt="QR" style="width: 50px; height: 50px;" />
-                                </div>
-                                <div class="flex-grow-1 overflow-hidden">
-                                    <div class="x-small text-muted fw-bold">Odkaz pro studenty:</div>
-                                    <a href="join/@group.InviteCode" target="_blank" class="x-small text-primary text-decoration-none text-truncate d-block">
-                                        @(NavigationManager.BaseUri)join/@group.InviteCode
-                                    </a>
-                                </div>
+                            <div class="p-4 pt-0">
+                                <button class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2" @onclick="() => NavigateToGroup(group.Id)">
+                                    <span class="bi bi-speedometer2"></span>
+                                    <span>Vstoupit do monitoringu</span>
+                                </button>
                             </div>
-                        </div>
-                        <div class="card-footer bg-transparent border-top-0 d-grid gap-2 pt-0">
-                            <button class="btn btn-primary" @onclick="() => NavigateToGroup(group.Id)">
-                                Detail a Realtime sledování
-                            </button>
                         </div>
                     </div>
-                </div>
-            }
-        </div>
-    }
+                }
+            </div>
+        }
+    </div>
 </div>
 
 @if (isModalVisible)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Nová skupina</h5>
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 1050;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="glass-card modal-content border-0 p-2 overflow-hidden shadow-2xl">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="fw-800 mb-0 text-slate-900">Nová skupina</h5>
                     <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body p-4">
                     <EditForm Model="@newGroup" OnValidSubmit="HandleCreateGroup">
                         <DataAnnotationsValidator />
                         
                         <div class="mb-3">
-                            <label class="form-label">Název skupiny</label>
-                            <InputText @bind-Value="newGroup.Name" class="form-control" placeholder="A2 - kvadratické rovnice 1" />
-                            <ValidationMessage For="@(() => newGroup.Name)" />
+                            <label class="form-label x-small fw-bold text-muted uppercase-title">Název skupiny</label>
+                            <InputText @bind-Value="newGroup.Name" class="form-control" placeholder="např. 8.A - Matematika 1" />
+                            <ValidationMessage For="@(() => newGroup.Name)" class="x-small mt-1 text-danger" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Popis cíle</label>
-                            <InputTextArea @bind-Value="newGroup.GoalDescription" class="form-control" placeholder="Studenti vyřeší samostatně 3 různé kvadratické rovnice..." rows="3" />
-                            <ValidationMessage For="@(() => newGroup.GoalDescription)" />
+                            <label class="form-label x-small fw-bold text-muted uppercase-title">Popis cíle výuky</label>
+                            <InputTextArea @bind-Value="newGroup.GoalDescription" class="form-control" placeholder="Co mají studenti vyřešit? Např. vyřešit 5 rovnic..." rows="3" style="resize: none;" />
+                            <ValidationMessage For="@(() => newGroup.GoalDescription)" class="x-small mt-1 text-danger" />
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Typ cíle</label>
-                            <InputSelect @bind-Value="newGroup.GoalType" class="form-select">
-                                <option value="@GoalType.Boolean">Splněno / Nesplněno</option>
-                                <option value="@GoalType.Percentage">Procentuální pokrok</option>
-                            </InputSelect>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label x-small fw-bold text-muted uppercase-title">Typ hodnocení</label>
+                                <InputSelect @bind-Value="newGroup.GoalType" class="form-select">
+                                    <option value="@GoalType.Boolean">Splněno / Ne</option>
+                                    <option value="@GoalType.Percentage">Procenta</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label x-small fw-bold text-muted uppercase-title">Cílová hodnota</label>
+                                <InputNumber @bind-Value="newGroup.TargetValue" class="form-control" />
+                                <ValidationMessage For="@(() => newGroup.TargetValue)" class="x-small mt-1 text-danger" />
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Cílová hodnota (např. počet úkolů)</label>
-                            <InputNumber @bind-Value="newGroup.TargetValue" class="form-control" />
-                            <ValidationMessage For="@(() => newGroup.TargetValue)" />
-                        </div>
-
-                        <div class="modal-footer px-0 pb-0">
-                            <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Zrušit</button>
-                            <button type="submit" class="btn btn-primary">Vytvořit skupinu</button>
+                        <div class="modal-footer border-0 px-0 pb-0 mt-4">
+                            <button type="button" class="btn btn-light px-4" @onclick="HideCreateModal">Zrušit</button>
+                            <button type="submit" class="btn btn-primary px-5 shadow-sm">Vytvořit</button>
                         </div>
                     </EditForm>
                 </div>
@@ -163,7 +174,7 @@
 
     private async Task HandleCreateGroup()
     {
-        var group = new Group
+        var groupRequest = new Group
         {
             Name = newGroup.Name,
             GoalDescription = newGroup.GoalDescription,
@@ -173,7 +184,7 @@
             IsActive = true
         };
 
-        await GroupService.CreateGroupAsync(group);
+        await GroupService.CreateGroupAsync(groupRequest);
         await LoadGroups();
         HideCreateModal();
         newGroup = new();
@@ -194,27 +205,34 @@
 
         public GoalType GoalType { get; set; } = GoalType.Boolean;
 
-        [System.ComponentModel.DataAnnotations.Range(1, 1000, ErrorMessage = "Cílová hodnota musí být mezi 1 a 1000")]
+        [System.ComponentModel.DataAnnotations.Range(1, 1000, ErrorMessage = "Hodnota 1-1000")]
         public int TargetValue { get; set; } = 1;
     }
 }
 
 <style>
+    .bg-slate-50 { background-color: #f8fafc; }
+    .text-slate-900 { color: #0f172a; }
+    .text-slate-800 { color: #1e293b; }
+    .text-slate-700 { color: #334155; }
+    
+    .fw-800 { font-weight: 800; }
+    
     .group-card {
-        transition: transform 0.2s, box-shadow 0.2s;
-        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: 1.25rem !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
     }
-    .group-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+
+    .text-truncate-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
     }
-    .x-small {
-        font-size: 0.75rem;
-    }
-    .shadow-xs {
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    .qr-preview {
-        line-height: 0;
+
+    .border-dashed { border: 2px dashed #e2e8f0 !important; }
+    
+    .shadow-2xl {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
     }
 </style>

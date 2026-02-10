@@ -3,48 +3,58 @@
 
 <PageTitle>Přihlášení - Scio</PageTitle>
 
-<div class="auth-container">
-    <div class="auth-card">
-        <h1>Přihlášení učitele</h1>
-        <p>Zadejte své údaje pro přístup do systému</p>
+<div class="auth-container px-3 fade-in">
+    <div class="auth-card glass-card">
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3 shadow-sm" style="width: 60px; height: 60px;">
+                <span class="bi bi-person-badge-fill h3 mb-0"></span>
+            </div>
+            <h1>Přihlášení</h1>
+            <p>Vítejte zpět v chatu Scio</p>
+        </div>
 
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <div class="alert alert-danger">@errorMessage</div>
+            <div class="alert alert-danger border-0 rounded-3 small mb-4 fade-in">
+                <span class="bi bi-x-circle-fill me-2"></span> @errorMessage
+            </div>
         }
 
         @if (isRegistered)
         {
-            <div class="alert alert-success">Registrace byla úspěšná. Nyní se můžete přihlásit.</div>
+            <div class="alert bg-success-light text-success border-0 rounded-3 small mb-4 fade-in">
+                <span class="bi bi-check-circle-fill me-2"></span> Registrace proběhla v pořádku. Přihlaste se.
+            </div>
         }
 
-        <form action="auth/login" method="post">
-            <div class="form-group">
-                <label for="login">Uživatelské jméno</label>
-                <input id="login" name="login" type="text" class="form-control" placeholder="jnovak" required />
+        <form action="auth/login" method="post" class="mb-4">
+            <div class="form-group mb-3">
+                <label class="x-small fw-bold text-muted uppercase-title mb-1">Uživatelské jméno</label>
+                <input id="login" name="login" type="text" class="form-control border-0 bg-light py-2" placeholder="např. jnovak" required />
             </div>
 
-            <div class="form-group">
-                <label for="password">Heslo</label>
-                <input id="password" name="password" type="password" class="form-control" placeholder="********" required />
+            <div class="form-group mb-4">
+                <label class="x-small fw-bold text-muted uppercase-title mb-1">Heslo</label>
+                <input id="password" name="password" type="password" class="form-control border-0 bg-light py-2" placeholder="********" required />
             </div>
 
-            <button type="submit" class="btn btn-primary w-100 mb-3">
+            <button type="submit" class="btn btn-primary w-100 py-3 shadow-md fw-bold">
                 Přihlásit se
             </button>
         </form>
 
-        <div class="separator text-center my-3">
-            <span class="bg-white px-2 text-muted">nebo</span>
+        <div class="separator mb-4">
+            <span class="px-3 x-small fw-bold text-muted uppercase-title">nebo</span>
         </div>
 
-        <a href="auth/google-login" class="btn btn-outline-dark w-100 d-flex align-items-center justify-content-center gap-2">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" height="18" alt="Google logo" />
-            Přihlásit se přes Google
+        <a href="auth/google-login" class="btn btn-white w-100 py-2 border rounded-3 d-flex align-items-center justify-content-center gap-2 shadow-sm mb-4">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" height="18" alt="G" />
+            <span class="fw-bold small">Přihlásit se přes Google</span>
         </a>
 
-        <div class="auth-footer">
-            Nemáte účet? <a href="register">Zaregistrujte se</a>
+        <div class="text-center mt-2">
+            <span class="text-muted small">Nemáte účet?</span> 
+            <a href="register" class="fw-bold text-primary small text-decoration-none ms-1">Vytvořit účet</a>
         </div>
     </div>
 </div>
@@ -58,14 +68,13 @@
         var uri = new Uri(NavigationManager.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
 
-        if (query.TryGetValue("error", out var error))
-        {
-            errorMessage = error;
-        }
-
-        if (query.TryGetValue("registered", out var reg) && reg == "true")
-        {
-            isRegistered = true;
-        }
+        if (query.TryGetValue("error", out var error)) errorMessage = error;
+        if (query.TryGetValue("registered", out var reg) && reg == "true") isRegistered = true;
     }
 }
+
+<style>
+    .btn-white { background: white; color: var(--text-main); }
+    .btn-white:hover { background: #f8fafc; color: var(--primary); }
+    .bg-success-light { background-color: #f0fdf4 !important; }
+</style>
