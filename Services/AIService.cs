@@ -26,28 +26,29 @@ public interface IAIService
     Task<AIAnalysisResult> AnalyzeMessageAsync(string goalDescription, string studentNickname, string messageContent, int currentProgress, int targetValue);
 }
 
-public class OpenAIService : IAIService
+public class GeminiAIService : IAIService
 {
     private readonly string _apiKey;
     private readonly HttpClient _httpClient;
 
-    public OpenAIService(IConfiguration configuration, HttpClient httpClient)
+    public GeminiAIService(IConfiguration configuration, HttpClient httpClient)
     {
-        _apiKey = configuration["AI:OpenAIApiKey"] ?? "";
+        _apiKey = configuration["AI:GeminiApiKey"] ?? "";
         _httpClient = httpClient;
-        _httpClient.Timeout = TimeSpan.FromSeconds(10); // Don't hang for too long
+        _httpClient.Timeout = TimeSpan.FromSeconds(15);
     }
 
     public async Task<AIAnalysisResult> AnalyzeMessageAsync(string goalDescription, string studentNickname, string messageContent, int currentProgress, int targetValue)
     {
         if (string.IsNullOrEmpty(_apiKey))
         {
-            // Fallback mock logic if API key is missing
-            return new AIAnalysisResult { IsProgress = false, NewProgressValue = currentProgress };
+            return new AIAnalysisResult { IsProgress = false, NewProgressValue = currentProgress, IsRelevant = true };
         }
 
         try
         {
+            var systemInstruction = "Jsi empatický asistent učitele. Tvým cílem je rozpoznat snahu studenta a jeho pokrok k cíli. Nejsi příliš přísný na formát, hledáš podstatu splnění úkolu. Úkoly mohou být matematické i kreativní (např. psaní básní, textů).";
+            
             var prompt = $@"
 Cíl úkolu pro studenta: {goalDescription}
 Jméno studenta: {studentNickname}
@@ -56,48 +57,56 @@ Aktuální stav pokroku studenta: {currentProgress} z {targetValue} (cílová ho
 Student právě poslal tuto zprávu:
 ""{messageContent}""
 
-Tvým úkolem je objektivně, ale s pochopením pro kreativitu, vyhodnotit tuto zprávu.
-- isRelevant: Je zpráva k tématu? (Např. student píše báseň, přemýšlí o zadání, klade dotaz k tématu). Pokud student plní kreativní úkol jako je psaní básně nebo eseje, je to VŽDY relevantní.
-- isProgress: Dokazuje zpráva, že student udělal reálný kus práce nebo úkol dokončil? (Např. napsal sloku básně, vyřešil příklad, odevzdal finální text).
-- newProgressValue: Pokud je to pokrok, navrhni novou hodnotu. Pokud je úkol splněn (např. odevzdaná celá báseň), nastav hodnotu na {targetValue}.
-- studentFeedback: Krátká věta pro studenta (česky). Musí být povzbudivá. Pokud udělal chybu, nekritizuj, ale naváděj.
-
-Odpověz POUZE ve formátu JSON:
+Tvým úkolem je vyhodnotit tuto zprávu a odpovědět POUZE ve formátu JSON:
 {{
-  ""isProgress"": bool,
-  ""isRelevant"": bool,
-  ""newProgressValue"": int,
-  ""feedback"": ""technická poznámka pro učitele"",
-  ""studentFeedback"": ""povzbuzení pro studenta""
+  ""isProgress"": bool (pravda, pokud zpráva posouvá studenta k cíli nebo dokazuje jeho splnění),
+  ""isRelevant"": bool (pravda, pokud se student věnuje úkolu, i když to není přímý pokrok - např. klade dotazy k tématu, píše první sloku básně apod.),
+  ""newProgressValue"": int (navrhni novou hodnotu celkového pokroku),
+  ""feedback"": ""technická poznámka pro učitele v češtině"",
+  ""studentFeedback"": ""krátká povzbudivá věta přímo pro studenta v češtině""
 }}";
 
             var requestBody = new
             {
-                model = "gpt-4o-mini",
-                messages = new[]
+                contents = new[]
                 {
-                    new { role = "system", content = "Jsi empatický asistent učitele. Tvým cílem je rozpoznat snahu studenta a jeho pokrok k cíli. Nejsi příliš přísný na formát, hledáš podstatu splnění úkolu. Úkoly mohou být matematické i kreativní (např. psaní textů)." },
-                    new { role = "user", content = prompt }
+                    new
+                    {
+                        parts = new[]
+                        {
+                            new { text = systemInstruction + "\n\n" + prompt }
+                        }
+                    }
                 },
-                response_format = new { type = "json_object" }
+                generationConfig = new
+                {
+                    response_mime_type = "application/json"
+                }
             };
 
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
-            request.Headers.Add("Authorization", $"Bearer {_apiKey}");
-            request.Content = new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.SendAsync(request);
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_apiKey}";
+            var response = await _httpClient.PostAsJsonAsync(url, requestBody);
             response.EnsureSuccessStatusCode();
 
             var jsonResponse = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(jsonResponse);
-            var resultText = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
+            var resultText = doc.RootElement
+                .GetProperty("candidates")[0]
+                .GetProperty("content")
+                .GetProperty("parts")[0]
+                .GetProperty("text")
+                .GetString();
 
             return JsonSerializer.Deserialize<AIAnalysisResult>(resultText!) ?? new AIAnalysisResult();
         }
         catch (Exception ex)
         {
-            return new AIAnalysisResult { IsProgress = false, NewProgressValue = currentProgress, Feedback = $"Chyba AI: {ex.Message}" };
+            return new AIAnalysisResult { 
+                IsProgress = false, 
+                NewProgressValue = currentProgress, 
+                IsRelevant = true,
+                Feedback = $"Chyba Gemini API: {ex.Message}" 
+            };
         }
     }
 }

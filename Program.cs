@@ -70,7 +70,7 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
-builder.Services.AddScoped<IAIService, OpenAIService>();
+builder.Services.AddScoped<IAIService, GeminiAIService>();
 builder.Services.AddHttpContextAccessor();
 
 // SignalR
