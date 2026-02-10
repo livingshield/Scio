@@ -1,0 +1,44 @@
+[Bb]in/
+[Oo]bj/
+[Rr]elease/
+[Dd]ebug/
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# Publish output
+publish/
+
+# Configuration files with secrets
+appsettings.json
+appsettings.Development.json
+
+# Scripts with secrets
+full_deploy.py
+force_upload_v2.py
+git_config.py
+.credentials
+analyze_ftp.py
+analyze_db.py
+deploy.py
+force_upload.py
+nuke_deploy.py
+smart_deploy.py
+upload_multiple.py
+upload_test.py
+check_infrastructure.py
+
+# Local database files
+*.mdf
+*.ldf
+
+# Logs
+logs/
+*.log
+stdout_*.log
+*.txt
+
+# Backup files from deploy
+*.bak

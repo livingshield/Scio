@@ -1,0 +1,198 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using ScioApp.Models
+@using ScioApp.Services
+@attribute [Authorize]
+@inject IGroupService GroupService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Dashboard - Scio</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Moje skupiny</h1>
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <span class="bi bi-plus" aria-hidden="true"></span> Vytvořit skupinu
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Načítám...</span>
+            </div>
+        </div>
+    }
+    else if (groups == null || !groups.Any())
+    {
+        <div class="alert alert-info">
+            Zatím jste nevytvořili žádnou skupinu. Začněte kliknutím na tlačítko "Vytvořit skupinu".
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            @foreach (var group in groups)
+            {
+                <div class="col">
+                    <div class="card h-100 shadow-sm group-card">
+                        <div class="card-body">
+                            <h5 class="card-title">@group.Name</h5>
+                            <p class="card-text text-muted small mb-2">
+                                <span class="bi bi-calendar3"></span> @group.CreatedAt.ToLocalTime().ToString("d. M. yyyy HH:mm")
+                            </p>
+                            <div class="mb-3">
+                                <strong>Cíl:</strong> @group.GoalDescription
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge @(group.IsActive ? "bg-success" : "bg-secondary")">
+                                    @(group.IsActive ? "Aktivní" : "Archivováno")
+                                </span>
+                                <span class="text-primary fw-bold">Kód: @group.InviteCode</span>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent border-top-0 d-grid gap-2">
+                            <button class="btn btn-outline-primary" @onclick="() => NavigateToGroup(group.Id)">
+                                Detail a Realtime sledování
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@if (isModalVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nová skupina</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@newGroup" OnValidSubmit="HandleCreateGroup">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Název skupiny</label>
+                            <InputText @bind-Value="newGroup.Name" class="form-control" placeholder="A2 - kvadratické rovnice 1" />
+                            <ValidationMessage For="@(() => newGroup.Name)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Popis cíle</label>
+                            <InputTextArea @bind-Value="newGroup.GoalDescription" class="form-control" placeholder="Studenti vyřeší samostatně 3 různé kvadratické rovnice..." rows="3" />
+                            <ValidationMessage For="@(() => newGroup.GoalDescription)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Typ cíle</label>
+                            <InputSelect @bind-Value="newGroup.GoalType" class="form-select">
+                                <option value="@GoalType.Boolean">Splněno / Nesplněno</option>
+                                <option value="@GoalType.Percentage">Procentuální pokrok</option>
+                            </InputSelect>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Cílová hodnota (např. počet úkolů)</label>
+                            <InputNumber @bind-Value="newGroup.TargetValue" class="form-control" />
+                            <ValidationMessage For="@(() => newGroup.TargetValue)" />
+                        </div>
+
+                        <div class="modal-footer px-0 pb-0">
+                            <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Zrušit</button>
+                            <button type="submit" class="btn btn-primary">Vytvořit skupinu</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Group>? groups;
+    private bool isLoading = true;
+    private bool isModalVisible = false;
+    private int currentUserId;
+    private GroupModel newGroup = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out currentUserId))
+            {
+                await LoadGroups();
+            }
+        }
+        
+        isLoading = false;
+    }
+
+    private async Task LoadGroups()
+    {
+        groups = await GroupService.GetTeacherGroupsAsync(currentUserId);
+    }
+
+    private void ShowCreateModal() => isModalVisible = true;
+    private void HideCreateModal() => isModalVisible = false;
+
+    private async Task HandleCreateGroup()
+    {
+        var group = new Group
+        {
+            Name = newGroup.Name,
+            GoalDescription = newGroup.GoalDescription,
+            GoalType = newGroup.GoalType,
+            TargetValue = newGroup.TargetValue,
+            TeacherId = currentUserId,
+            IsActive = true
+        };
+
+        await GroupService.CreateGroupAsync(group);
+        await LoadGroups();
+        HideCreateModal();
+        newGroup = new();
+    }
+
+    private void NavigateToGroup(int groupId)
+    {
+        NavigationManager.NavigateTo($"group/{groupId}");
+    }
+
+    public class GroupModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Název je povinný")]
+        public string Name { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Popis cíle je povinný")]
+        public string GoalDescription { get; set; } = "";
+
+        public GoalType GoalType { get; set; } = GoalType.Boolean;
+
+        [System.ComponentModel.DataAnnotations.Range(1, 1000, ErrorMessage = "Cílová hodnota musí být mezi 1 a 1000")]
+        public int TargetValue { get; set; } = 1;
+    }
+}
+
+<style>
+    .group-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    .group-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+    }
+</style>

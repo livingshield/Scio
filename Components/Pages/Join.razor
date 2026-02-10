@@ -1,0 +1,120 @@
+@page "/join/{inviteCode?}"
+@rendermode InteractiveServer
+@using ScioApp.Services
+@using ScioApp.Models
+@inject IStudentService StudentService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Připojit se ke skupině - Scio</PageTitle>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h1>Připojit se k výuce</h1>
+        <p>Zadejte svou přezdívku a kód skupiny</p>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="form-group">
+            <label for="inviteCode">Kód skupiny</label>
+            <input id="inviteCode" @bind="InviteCode" class="form-control" placeholder="ABC123XY" readonly="@(!string.IsNullOrEmpty(inviteCode))" />
+        </div>
+
+        <div class="form-group">
+            <label for="nickname">Tvoje přezdívka (v uvozovkách "Nick")</label>
+            <input id="nickname" @bind="Nickname" class="form-control" placeholder="Např. SuperMatematik" />
+        </div>
+
+        <button @onclick="HandleJoin" class="btn btn-primary w-100" disabled="@isSubmitting">
+            @if (isSubmitting)
+            {
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <span> Připojuji...</span>
+            }
+            else
+            {
+                <span>Vstoupit do skupiny</span>
+            }
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? inviteCode { get; set; }
+    
+    private string InviteCode { get; set; } = "";
+    private string Nickname { get; set; } = "";
+    private string? errorMessage;
+    private bool isSubmitting = false;
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(inviteCode))
+        {
+            InviteCode = inviteCode;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Auto-join if device already registered for this group
+            if (!string.IsNullOrEmpty(InviteCode))
+            {
+                var deviceId = await GetOrCreateDeviceId();
+                // Logic to check if already joined could go here, 
+                // but for simplicity we'll let the HandleJoin handle it if they click.
+            }
+        }
+    }
+
+    private async Task HandleJoin()
+    {
+        if (string.IsNullOrWhiteSpace(InviteCode))
+        {
+            errorMessage = "Zadejte kód skupiny.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Nickname))
+        {
+            errorMessage = "Zadejte svou přezdívku.";
+            return;
+        }
+
+        isSubmitting = true;
+        errorMessage = null;
+
+        var deviceId = await GetOrCreateDeviceId();
+        var result = await StudentService.JoinGroupAsync(InviteCode, Nickname, deviceId);
+
+        if (result.Success && result.Student != null)
+        {
+            // Save info to local storage for persistence
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"scio_group_{result.Student.GroupId}_nick", result.Student.Nickname);
+            
+            NavigationManager.NavigateTo($"chat/{result.Student.GroupId}");
+        }
+        else
+        {
+            errorMessage = result.Message;
+        }
+
+        isSubmitting = false;
+    }
+
+    private async Task<string> GetOrCreateDeviceId()
+    {
+        var deviceId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "scio_device_id");
+        if (string.IsNullOrEmpty(deviceId))
+        {
+            deviceId = Guid.NewGuid().ToString();
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "scio_device_id", deviceId);
+        }
+        return deviceId;
+    }
+}

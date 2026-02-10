@@ -1,0 +1,70 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/scio/" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="ScioApp.styles.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="_framework/blazor.web.js"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.scrollToBottom = (elementId) => {
+            var element = document.getElementById(elementId);
+            if (element) {
+                element.scrollTop = element.scrollHeight;
+            }
+        }
+
+        window.renderMath = () => {
+            if (window.MathJax && window.MathJax.typeset) {
+                window.MathJax.typeset();
+            }
+        }
+
+        window.startVoiceRecognition = (dotNetHelper) => {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Váš prohlížeč nepodporuje diktování hlasem.");
+                return;
+            }
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'cs-CZ';
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                dotNetHelper.invokeMethodAsync('OnVoiceResult', text);
+            };
+            recognition.start();
+        }
+    </script>
+    <style>
+        code {
+            background-color: rgba(0,0,0,0.05);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+        pre code {
+            display: block;
+            padding: 1rem;
+            overflow-x: auto;
+            background: #2d2d2d;
+            color: #f8f8f2;
+        }
+        .math-container {
+            overflow-x: auto;
+            max-width: 100%;
+        }
+    </style>
+</body>
+
+</html>

@@ -1,0 +1,329 @@
+@page "/group/{GroupId:int}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.SignalR.Client
+@using ScioApp.Models
+@using ScioApp.Services
+@attribute [Authorize]
+@inject IGroupService GroupService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>Sledování výuky - Scio</PageTitle>
+
+<div class="container-fluid mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="">Dashboard</a></li>
+            <li class="breadcrumb-item active">@group?.Name</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="h3 mb-1">@group?.Name</h1>
+            <p class="text-muted mb-0"><strong>Cíl:</strong> @group?.GoalDescription</p>
+        </div>
+        <div class="text-end d-flex align-items-center gap-3">
+            <div>
+                <div class="h5 mb-0">Kod pro studenty: <span class="badge bg-primary fs-5">@group?.InviteCode</span></div>
+                <div class="small text-muted">Aktivní monitoring probíhá</div>
+            </div>
+            <div class="qr-container bg-white p-1 border rounded shadow-sm">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=@(Uri.EscapeDataString(NavigationManager.BaseUri + "join/" + group?.InviteCode))" 
+                     alt="QR Code" style="width: 80px; height: 80px;" />
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status"></div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="@(selectedStudentId == null ? "col-12" : "col-md-7 col-lg-8")">
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-3">
+                    @foreach (var student in students.Values.OrderBy(s => s.Nickname))
+                    {
+                        <div class="col">
+                            <div class="card h-100 student-monitor-card @(student.Status == StudentStatus.NeedHelp ? "border-danger bg-light-danger" : "") @(selectedStudentId == student.Id ? "border-primary shadow" : "")"
+                                 @onclick="() => SelectStudent(student.Id)" style="cursor: pointer;">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="card-title mb-0 text-truncate" style="max-width: 120px;" title="@student.Nickname">@student.Nickname</h6>
+                                        <span class="badge @GetStatusBadgeClass(student.Status)">
+                                            @statusLabels[student.Status]
+                                        </span>
+                                    </div>
+
+                                    @if (group?.GoalType == GoalType.Boolean)
+                                    {
+                                        @if (student.ProgressLog?.IsCompleted == true)
+                                        {
+                                            <div class="text-center mb-2">
+                                                <span class="text-success fs-3">✔</span>
+                                                <div class="x-small fw-bold text-success">Splněno</div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="text-center mb-2">
+                                                <span class="text-secondary fs-3">☐</span>
+                                                <div class="x-small text-muted">Nesplněno</div>
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <div class="progress mb-2" style="height: 12px;">
+                                            <div class="progress-bar @(student.Status == StudentStatus.Completed ? "bg-success" : "bg-primary")" 
+                                                 role="progressbar" 
+                                                 style="width: @(student.ProgressLog?.Percentage ?? 0)%"
+                                                 aria-valuenow="@(student.ProgressLog?.Percentage ?? 0)" 
+                                                 aria-valuemin="0" aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-between x-small">
+                                            <span>Pokrok: <strong>@(student.ProgressLog?.CurrentValue ?? 0) / @(group?.TargetValue ?? 0)</strong></span>
+                                            <span class="text-muted">@GetLastActivityText(student.LastActivityAt)</span>
+                                        </div>
+                                    }
+                                </div>
+                                @if (student.Status == StudentStatus.NeedHelp)
+                                {
+                                    <div class="card-footer bg-danger text-white py-1 text-center x-small fw-bold border-top-0 d-flex align-items-center justify-content-center gap-2">
+                                        <span>POMOC!</span>
+                                        <button class="btn btn-sm btn-light py-0 px-2" style="font-size: 0.7rem;" @onclick:stopPropagation="true" @onclick="() => ResolveHelp(student.Id)">
+                                            ✔ Vyřešeno
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (!students.Any())
+                {
+                    <div class="text-center py-5 border rounded bg-light mt-4 px-3">
+                        <div class="h4 text-muted mb-3">Zatím se nepřipojili žádní studenti</div>
+                        <p class="mb-0">Sdílejte kód <strong>@group?.InviteCode</strong> nebo QR kód výše.</p>
+                        <div class="mt-3">
+                            <small>Adresa pro připojení: <br class="d-md-none" /> <code>@(NavigationManager.BaseUri)join/@group?.InviteCode</code></small>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (selectedStudentId != null && students.TryGetValue(selectedStudentId.Value, out var selStudent))
+            {
+                <div class="col-md-5 col-lg-4">
+                    <div class="card shadow-sm sticky-top" style="top: 1rem; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 text-truncate">Detail: @selStudent.Nickname</h5>
+                            <button class="btn-close" @onclick="() => selectedStudentId = null"></button>
+                        </div>
+                        <div class="card-body overflow-auto p-0">
+                            <div class="p-3 bg-light border-bottom">
+                                <div class="small fw-bold text-muted mb-1">Klíčové zprávy vedoucí k pokroku:</div>
+                            </div>
+                            <div class="p-3">
+                                @{
+                                    var progressMessages = allMessages.Where(m => m.StudentId == selStudent.Id && m.IsProgressContribution).OrderByDescending(m => m.Timestamp);
+                                    if (!progressMessages.Any())
+                                    {
+                                        <div class="text-center py-4 text-muted small">
+                                            Zatím žádné zprávy uznané jako pokrok.
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="list-group list-group-flush">
+                                            @foreach (var m in progressMessages)
+                                            {
+                                                <div class="list-group-item border-start border-4 border-success mb-2 rounded bg-white shadow-xs">
+                                                    <div class="d-flex justify-content-between mb-1 gap-2">
+                                                        <span class="badge bg-success py-0" style="height: fit-content;">Důkaz pokroku</span>
+                                                        <small class="text-muted flex-shrink-0">@m.Timestamp.ToLocalTime().ToString("HH:mm")</small>
+                                                    </div>
+                                                    <div class="small text-break">@m.Content</div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int GroupId { get; set; }
+
+    private Group? group;
+    private Dictionary<int, Student> students = new();
+    private List<Message> allMessages = new();
+    private int? selectedStudentId;
+    private bool isLoading = true;
+    private HubConnection? hubConnection;
+
+    private readonly Dictionary<StudentStatus, string> statusLabels = new()
+    {
+        { StudentStatus.Active, "Aktivní" },
+        { StudentStatus.NeedHelp, "Pomoc!" },
+        { StudentStatus.Inactive, "Neaktivní" },
+        { StudentStatus.Completed, "Hotovo" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        group = await GroupService.GetGroupByIdAsync(GroupId);
+        if (group != null)
+        {
+            foreach (var s in group.Students)
+            {
+                students[s.Id] = s;
+            }
+            allMessages = await GroupService.GetGroupMessagesAsync(GroupId);
+        }
+        isLoading = false;
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("sciohub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<string>("UserJoined", async (nickname) =>
+        {
+            await RefreshStudents();
+            StateHasChanged();
+        });
+
+        hubConnection.On<int, string, DateTime, bool, bool, string>("ReceiveMessage", (sid, content, time, isProgress, isRelevant, feedback) =>
+        {
+            if (students.TryGetValue(sid, out var s))
+            {
+                s.LastActivityAt = DateTime.UtcNow;
+                allMessages.Add(new Message { StudentId = sid, Content = content, Timestamp = time, IsProgressContribution = isProgress });
+                StateHasChanged();
+            }
+        });
+
+        hubConnection.On<int, int>("ProgressUpdated", (sid, val) =>
+        {
+            if (students.TryGetValue(sid, out var s) && s.ProgressLog != null)
+            {
+                s.ProgressLog.CurrentValue = val;
+                s.ProgressLog.IsCompleted = val >= (group?.TargetValue ?? 0);
+                StateHasChanged();
+            }
+        });
+
+        hubConnection.On<int, StudentStatus>("StatusChanged", (sid, status) =>
+        {
+            if (students.TryGetValue(sid, out var s))
+            {
+                s.Status = status;
+                StateHasChanged();
+            }
+        });
+
+        await hubConnection.StartAsync();
+        await hubConnection.InvokeAsync("JoinGroup", GroupId, "", true);
+    }
+
+    private void SelectStudent(int id)
+    {
+        selectedStudentId = id;
+    }
+
+    private async Task ResolveHelp(int studentId)
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, studentId, false);
+            if (students.TryGetValue(studentId, out var s))
+            {
+                s.Status = StudentStatus.Active;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task RefreshStudents()
+    {
+        var updatedGroup = await GroupService.GetGroupByIdAsync(GroupId);
+        if (updatedGroup != null)
+        {
+            foreach (var s in updatedGroup.Students)
+            {
+                students[s.Id] = s;
+            }
+        }
+    }
+
+    private string GetStatusBadgeClass(StudentStatus status) => status switch
+    {
+        StudentStatus.Active => "bg-primary",
+        StudentStatus.NeedHelp => "bg-danger flash-anim",
+        StudentStatus.Inactive => "bg-warning text-dark",
+        StudentStatus.Completed => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private string GetLastActivityText(DateTime lastActivity)
+    {
+        var diff = DateTime.UtcNow - lastActivity;
+        if (diff.TotalSeconds < 30) return "nyní";
+        if (diff.TotalSeconds < 60) return "před < 1m";
+        return $"před {Math.Floor(diff.TotalMinutes)}m";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
+<style>
+    .student-monitor-card {
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .student-monitor-card:hover {
+        transform: scale(1.02);
+    }
+    .bg-light-danger {
+        background-color: #fff8f8;
+    }
+    .flash-anim {
+        animation: flash 1s infinite;
+    }
+    .x-small {
+        font-size: 0.75rem;
+    }
+    .qr-container {
+        line-height: 0;
+    }
+    .shadow-xs {
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    @@keyframes flash {
+        0% { opacity: 1; }
+        50% { opacity: 0.6; }
+        100% { opacity: 1; }
+    }
+</style>

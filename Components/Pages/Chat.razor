@@ -1,0 +1,443 @@
+@page "/chat/{GroupId:int}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using ScioApp.Models
+@using ScioApp.Services
+@inject IStudentService StudentService
+@inject IGroupService GroupService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>Chat výuky - Scio</PageTitle>
+
+<div class="chat-wrapper">
+    <div class="chat-header">
+        <div class="container d-flex justify-content-between align-items-center h-100">
+            <div>
+                <h2 class="h5 mb-0">@group?.Name</h2>
+                <div class="small opacity-75">Cíl: @group?.GoalDescription</div>
+            </div>
+            <div class="text-end">
+                <div class="nickname">@student?.Nickname</div>
+                @if (group?.GoalType == GoalType.Boolean)
+                {
+                    <div class="progress-info">
+                        @if (student?.ProgressLog?.IsCompleted == true)
+                        {
+                            <span class="text-success fw-bold">✔ Splněno</span>
+                        }
+                        else
+                        {
+                            <span class="text-warning">☐ Nesplněno</span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="progress-info">
+                        Pokrok: @(student?.ProgressLog?.CurrentValue ?? 0) / @(group?.TargetValue ?? 0)
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (group?.GoalType == GoalType.Boolean)
+    {
+        <div class="progress-bar-container d-flex align-items-center justify-content-center" style="padding: 2px 0;">
+            @if (student?.ProgressLog?.IsCompleted == true)
+            {
+                <span class="badge bg-success">✔ Cíl splněn</span>
+            }
+            else
+            {
+                <span class="badge bg-secondary">☐ Cíl dosud nesplněn</span>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="progress-bar-container">
+            <div class="progress" style="height: 5px;">
+                <div class="progress-bar bg-success" role="progressbar" 
+                     style="width: @(student?.ProgressLog?.Percentage ?? 0)%" 
+                     aria-valuenow="@(student?.ProgressLog?.Percentage ?? 0)" 
+                     aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+        </div>
+    }
+
+    <div class="chat-messages" id="chatLines">
+        @foreach (var msg in messages)
+        {
+            <div class="message @(msg.StudentId == student?.Id ? "own" : "") @(msg.IsSystemMessage ? "system" : "") @(msg.IsProgressContribution ? "contribution" : "") @(msg.Metadata?.IsRelevant == false ? "is-irrelevant" : "")">
+                @if (!msg.IsSystemMessage && msg.StudentId != student?.Id)
+                {
+                    <div class="sender">@(msg.Student?.Nickname ?? "Ostatní")</div>
+                }
+                <div class="content">@msg.Content</div>
+                @if (msg.IsProgressContribution)
+                {
+                    <div class="contribution-badge"><span class="bi bi-patch-check-fill"></span> AI uznává pokrok!</div>
+                }
+                @if (msg.Metadata?.IsRelevant == false)
+                {
+                    <div class="irrelevant-badge"><span class="bi bi-exclamation-triangle"></span> Nerelevantní k cíli</div>
+                }
+                @if (!string.IsNullOrEmpty(msg.Metadata?.StudentFeedback))
+                {
+                    <div class="ai-feedback">
+                        <span class="bi bi-info-circle"></span> @msg.Metadata.StudentFeedback
+                    </div>
+                }
+                <div class="time">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input-area">
+        @if (showInactivityWarning)
+        {
+            <div class="alert alert-warning py-1 px-3 mb-0 rounded-0 border-0 x-small text-center">
+                <span class="bi bi-clock-history"></span> Pár minut už jsi nic nenapsal(a). Pracuješ na úkolu?
+            </div>
+        }
+        <div class="container py-2">
+            <div class="small fw-bold text-muted mb-1">Sem napište své řešení příkladu:</div>
+            <div class="d-flex gap-2">
+                <button class="btn @(isNeedsHelp ? "btn-danger" : "btn-outline-danger") btn-sm" @onclick="ToggleHelp" title="Klikněte, pokud si nevíte rady - upozorní to učitele">
+                    <span class="bi bi-question-circle"></span>
+                    <span class="d-none d-md-inline"> Potřebuji pomoc</span>
+                </button>
+                <textarea @bind="newMessage" @bind:event="oninput" @onkeydown="HandleKeyDown" 
+                          class="form-control" placeholder="Napište výsledek nebo postup..." rows="2" style="resize: none;"></textarea>
+                <div class="d-flex flex-column gap-1">
+                    <button class="btn btn-primary h-100" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(newMessage))" title="Odeslat">
+                        <span class="bi bi-send"></span>
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="StartVoice" title="Diktovat hlasem">
+                        <span class="bi bi-mic-fill @(isListening ? "text-danger" : "")"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int GroupId { get; set; }
+
+    private Group? group;
+    private Student? student;
+    private List<ChatMessage> messages = new();
+    private string newMessage = "";
+    private bool isNeedsHelp = false;
+    private bool isListening = false;
+    private HubConnection? hubConnection;
+    private DotNetObjectReference<Chat>? objRefContent;
+    
+    // Watchdog
+    private System.Threading.Timer? inactivityTimer;
+    private bool showInactivityWarning = false;
+    private DateTime lastActivityTime = DateTime.UtcNow;
+
+    public class ChatMessage : Message
+    {
+        public MessageMetadata? Metadata { get; set; }
+    }
+
+    public class MessageMetadata
+    {
+        public bool IsRelevant { get; set; } = true;
+        public string? StudentFeedback { get; set; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var deviceId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "scio_device_id");
+            if (string.IsNullOrEmpty(deviceId))
+            {
+                NavigationManager.NavigateTo($"join/{GroupId}");
+                return;
+            }
+
+            student = await StudentService.GetStudentByDeviceAsync(GroupId, deviceId);
+            if (student == null)
+            {
+                NavigationManager.NavigateTo($"join/{GroupId}");
+                return;
+            }
+
+            group = student.Group;
+            isNeedsHelp = student.Status == StudentStatus.NeedHelp;
+
+            // Load history
+            var history = await GroupService.GetGroupMessagesAsync(GroupId);
+            messages = history.Select(m => new ChatMessage 
+            { 
+                Id = m.Id, 
+                StudentId = m.StudentId, 
+                Content = m.Content, 
+                Timestamp = m.Timestamp, 
+                IsProgressContribution = m.IsProgressContribution,
+                Student = m.Student,
+                IsSystemMessage = m.IsSystemMessage
+            }).ToList();
+
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(NavigationManager.ToAbsoluteUri("sciohub"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            hubConnection.On<int, string, DateTime, bool, bool, string>("ReceiveMessage", (sid, content, time, isProgress, isRelevant, feedback) =>
+            {
+                var senderNickname = sid == 0 ? "Systém" : (sid == student.Id ? student.Nickname : "Ostatní");
+                
+                messages.Add(new ChatMessage 
+                { 
+                    StudentId = sid, 
+                    Content = content, 
+                    Timestamp = time,
+                    IsProgressContribution = isProgress,
+                    Metadata = new MessageMetadata { IsRelevant = isRelevant, StudentFeedback = feedback },
+                    Student = new Student { Nickname = senderNickname, DeviceId = "" }
+                });
+                
+                if (sid == student.Id)
+                {
+                    ResetWatchdog();
+                }
+                
+                InvokeAsync(StateHasChanged);
+                ScrollToBottom();
+                JSRuntime.InvokeVoidAsync("renderMath");
+            });
+
+            hubConnection.On<int, int>("ProgressUpdated", (sid, val) => {
+                if (student != null && sid == student.Id && student.ProgressLog != null) {
+                    student.ProgressLog.CurrentValue = val;
+                    StateHasChanged();
+                }
+            });
+
+            hubConnection.On<int, StudentStatus>("StatusChanged", (sid, status) => {
+                if (student != null && sid == student.Id) {
+                    student.Status = status;
+                    isNeedsHelp = status == StudentStatus.NeedHelp;
+                    StateHasChanged();
+                }
+            });
+
+            await hubConnection.StartAsync();
+            await hubConnection.InvokeAsync("JoinGroup", GroupId, deviceId, false);
+            
+            StartWatchdog();
+            
+            StateHasChanged();
+            ScrollToBottom();
+        }
+    }
+
+    private void StartWatchdog()
+    {
+        inactivityTimer = new System.Threading.Timer(WatchdogCheck, null, 10000, 10000);
+    }
+
+    private void ResetWatchdog()
+    {
+        lastActivityTime = DateTime.UtcNow;
+        showInactivityWarning = false;
+    }
+
+    private async void WatchdogCheck(object? state)
+    {
+        var inactiveSeconds = (DateTime.UtcNow - lastActivityTime).TotalSeconds;
+        
+        bool shouldWarn = inactiveSeconds > 180; // 3 minutes
+        bool shouldMarkInactive = inactiveSeconds > 300; // 5 minutes
+
+        if (shouldMarkInactive && student?.Status != StudentStatus.Inactive)
+        {
+            if (hubConnection?.State == HubConnectionState.Connected)
+            {
+                await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, student?.Id, false); 
+                // We use SignalNeedHelp to set status, but we need a status for Inactive.
+                // For now, let's just make it call a dedicated hub method if we add it, othewise we'll stick to a status update.
+            }
+        }
+
+        if (shouldWarn != showInactivityWarning)
+        {
+            showInactivityWarning = shouldWarn;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(newMessage) || student == null || hubConnection == null) return;
+
+        var content = newMessage;
+        newMessage = "";
+
+        await hubConnection.InvokeAsync("SendMessage", GroupId, student.Id, content);
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task ToggleHelp()
+    {
+        if (student == null || hubConnection == null) return;
+        isNeedsHelp = !isNeedsHelp;
+        await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, student.Id, isNeedsHelp);
+    }
+
+    private void ScrollToBottom()
+    {
+        JSRuntime.InvokeVoidAsync("scrollToBottom", "chatLines");
+    }
+
+    private async Task StartVoice()
+    {
+        isListening = true;
+        objRefContent = DotNetObjectReference.Create(this);
+        await JSRuntime.InvokeVoidAsync("startVoiceRecognition", objRefContent);
+    }
+
+    [JSInvokable]
+    public void OnVoiceResult(string text)
+    {
+        newMessage += (string.IsNullOrEmpty(newMessage) ? "" : " ") + text;
+        isListening = false;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        objRefContent?.Dispose();
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
+
+<style>
+    .chat-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        max-height: 100vh;
+        overflow: hidden;
+    }
+    .chat-header {
+        background: #1b6ec2;
+        color: white;
+        padding: 0.4rem 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        z-index: 10;
+    }
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.75rem;
+        background: #f0f2f5;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    .message {
+        max-width: 80%;
+        padding: 0.5rem 1rem;
+        border-radius: 1rem;
+        background: white;
+        align-self: flex-start;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        position: relative;
+    }
+    .message.own {
+        align-self: flex-end;
+        background: #0084ff;
+        color: white;
+    }
+    .message.system {
+        align-self: center;
+        background: #e9ecef;
+        color: #495057;
+        font-size: 0.8rem;
+        border-radius: 0.5rem;
+    }
+    .message.contribution {
+        border: 2px solid #28a745;
+        background: #f8fff9;
+    }
+    .message.own.contribution {
+        background: #0084ff;
+        border-color: #7fff00;
+    }
+    .message.is-irrelevant {
+        opacity: 0.8;
+        border: 1px dashed #dc3545;
+    }
+    .contribution-badge {
+        font-size: 0.7rem;
+        color: #28a745;
+        font-weight: bold;
+        margin-top: 0.3rem;
+        display: flex;
+        align-items: center;
+        gap: 0.2rem;
+    }
+    .irrelevant-badge {
+        font-size: 0.7rem;
+        color: #dc3545;
+        margin-top: 0.3rem;
+        display: flex;
+        align-items: center;
+        gap: 0.2rem;
+    }
+    .ai-feedback {
+        font-size: 0.75rem;
+        color: #1b6ec2;
+        font-style: italic;
+        margin-top: 0.4rem;
+        padding-top: 0.3rem;
+        border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    .message.own .ai-feedback {
+        color: #e0f0ff;
+        border-top-color: rgba(255,255,255,0.2);
+    }
+    .message.own .irrelevant-badge {
+        color: #ffc2c2;
+    }
+    .message.own .contribution-badge {
+        color: #7fff00;
+    }
+    .message .sender {
+        font-size: 0.7rem;
+        font-weight: bold;
+        margin-bottom: 0.2rem;
+        opacity: 0.8;
+    }
+    .message .time {
+        font-size: 0.6rem;
+        text-align: right;
+        margin-top: 0.2rem;
+        opacity: 0.6;
+    }
+    .chat-input-area {
+        background: white;
+        border-top: 1px solid #dee2e6;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+</style>
