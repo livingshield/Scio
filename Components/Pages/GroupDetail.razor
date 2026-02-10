@@ -193,8 +193,9 @@
                         <input type="text" class="form-control" @bind="emailSubject" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Obsah e-mailu (HTML náhled)</label>
-                        <textarea class="form-control font-monospace" @bind="emailBody" rows="10" style="font-size: 0.85rem; background: #f8f9fa; border: 1px solid #dee2e6;"></textarea>
+                        <label class="form-label fw-bold">Text zprávy pro studenty</label>
+                        <textarea class="form-control" @bind="emailBody" rows="8" style="background: #ffffff; border: 1px solid #dee2e6;" placeholder="Např.: Ahoj, posílám pozvánku k dnešnímu úkolu."></textarea>
+                        <div class="form-text">Zadejte prostý text. Odkaz na úkol a formátování budou doplněny automaticky.</div>
                     </div>
                     
                     @if (!string.IsNullOrEmpty(emailStatus))
@@ -315,20 +316,15 @@
         emailStatus = "";
         emailSubject = $"Pozvánka ke spolupráci: {group?.Name}";
         
-        var joinUrl = $"{NavigationManager.BaseUri}join/{group?.InviteCode}";
-        emailBody = $@"<html>
-<body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
-    <h2 style='color: #0d6efd;'>Ahoj, připoj se do skupiny {group?.Name}!</h2>
-    <p>Právě jsem založil(a) novou aktivitu v aplikaci Scio. Tvým cílem je:</p>
-    <div style='background: #f8f9fa; padding: 15px; border-left: 5px solid #0d6efd; margin: 15px 0;'>
-        <strong>{group?.GoalDescription}</strong>
-    </div>
-    <p>Do skupiny se připojíš kliknutím na tento odkaz:</p>
-    <p><a href='{joinUrl}' style='display: inline-block; padding: 10px 20px; background: #0d6efd; color: white; text-decoration: none; border-radius: 5px;'>PŘIPOJIT SE K AKTIVITĚ</a></p>
-    <p>Nebo využij přiložený QR kód v příloze e-mailu.</p>
-    <p>Těším se na tvou práci!<br>Tvůj učitel</p>
-</body>
-</html>";
+        emailBody = $@"Ahoj, připoj se do skupiny {group?.Name}!
+
+Právě jsem založil(a) novou aktivitu v aplikaci Scio. Tvým cílem je:
+{group?.GoalDescription}
+
+Do skupiny se připojíš kliknutím na odkaz níže nebo po naskenování QR kódu v příloze e-mailu.
+
+Těším se na tvou práci!
+Tvůj učitel";
         isEmailModalVisible = true;
     }
 
@@ -357,10 +353,29 @@
                 Console.WriteLine($"QR code download failed: {ex.Message}");
             }
 
+            var printableBody = emailBody.Replace("\n", "<br />");
+            var joinUrl = $"{NavigationManager.BaseUri}join/{group?.InviteCode}";
+            
+            var htmlFinal = $@"<html>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+    <div style='max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;'>
+        <h2 style='color: #0d6efd; border-bottom: 2px solid #0d6efd; padding-bottom: 10px;'>Pozvánka: {group?.Name}</h2>
+        <div style='margin: 20px 0;'>
+            {printableBody}
+        </div>
+        <div style='text-align: center; margin: 30px 0;'>
+            <a href='{joinUrl}' style='display: inline-block; padding: 12px 25px; background: #0d6efd; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;'>VSTOUPIT DO SKUPINY</a>
+        </div>
+        <p style='font-size: 0.9rem; color: #666;'>Odkaz: <a href='{joinUrl}'>{joinUrl}</a></p>
+        <p style='font-size: 0.8rem; color: #999; margin-top: 30px; border-top: 1px solid #eee; pt: 10px;'>Tento e-mail byl odeslán z aplikace Scio Monitoring.</p>
+    </div>
+</body>
+</html>";
+
             await EmailService.SendEmailAsync(
                 emailRecipients, 
                 emailSubject, 
-                emailBody, 
+                htmlFinal, 
                 $"pozvanka_qr_{group?.InviteCode}.jpg", 
                 qrBytes);
             
