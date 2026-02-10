@@ -90,7 +90,32 @@ public class ScioHub : Hub
             message.Timestamp, 
             message.IsProgressContribution,
             isRelevant,
-            studentFeedback);
+            studentFeedback,
+            false); // isFromTeacher = false
+    }
+
+    public async Task SendTeacherMessage(int groupId, int studentId, string content)
+    {
+        var message = new Message
+        {
+            GroupId = groupId,
+            StudentId = studentId,
+            Content = content,
+            Timestamp = DateTime.UtcNow,
+            IsFromTeacher = true
+        };
+        _context.Messages.Add(message);
+        await _context.SaveChangesAsync();
+
+        await Clients.Group($"group_{groupId}").SendAsync("ReceiveMessage", 
+            message.Id,
+            studentId, 
+            content, 
+            message.Timestamp, 
+            false, // isProgress
+            true,  // isRelevant
+            null,  // feedback
+            true); // isFromTeacher = true
     }
 
     public async Task ApproveMessage(int groupId, int messageId)

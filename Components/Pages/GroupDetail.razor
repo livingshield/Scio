@@ -146,7 +146,18 @@
                         </div>
                         <div class="card-body overflow-auto p-0">
                             <div class="p-3 bg-light border-bottom">
-                                <div class="small fw-bold text-muted mb-1">Historie komunikace studenta:</div>
+                                <div class="small fw-bold text-muted mb-1">Historie komunikace:</div>
+                            </div>
+                            <div class="p-3 border-bottom bg-white">
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" @bind="teacherMessageText" 
+                                           @bind:event="oninput" @onkeydown="@HandleTeacherKey"
+                                           placeholder="Napište studentovi zprávu..." />
+                                    <button class="btn btn-primary" type="button" @onclick="SendTeacherMessage" 
+                                            disabled="@(string.IsNullOrWhiteSpace(teacherMessageText))">
+                                        Odeslat
+                                    </button>
+                                </div>
                             </div>
                             <div class="p-3">
                                 @{
@@ -162,11 +173,15 @@
                                         <div class="list-group list-group-flush">
                                             @foreach (var m in studentMessages)
                                             {
-                                                <div class="list-group-item @(m.IsProgressContribution ? "border-start border-4 border-success bg-white shadow-xs" : "bg-transparent") mb-2 rounded border-light">
+                                                <div class="list-group-item @(m.IsProgressContribution ? "border-start border-4 border-success bg-white shadow-xs" : (m.IsFromTeacher ? "bg-light-blue border-start border-4 border-primary" : "bg-transparent")) mb-2 rounded border-light">
                                                     <div class="d-flex justify-content-between mb-1 gap-2">
                                                         @if (m.IsProgressContribution)
                                                         {
                                                             <span class="badge bg-success py-0" style="height: fit-content;">Uznaný pokrok</span>
+                                                        }
+                                                        else if (m.IsFromTeacher)
+                                                        {
+                                                            <span class="badge bg-primary py-0" style="height: fit-content;">Vy (Učitel)</span>
                                                         }
                                                         else
                                                         {
@@ -176,7 +191,7 @@
                                                         }
                                                         <small class="text-muted flex-shrink-0">@m.Timestamp.ToLocalTime().ToString("HH:mm")</small>
                                                     </div>
-                                                    <div class="small text-break">@m.Content</div>
+                                                    <div class="small text-break @(m.IsFromTeacher ? "fst-italic" : "")">@m.Content</div>
                                                 </div>
                                             }
                                         </div>
@@ -258,6 +273,27 @@
     private string emailSubject = "";
     private string emailBody = "";
     private string emailStatus = "";
+    private string teacherMessageText = "";
+
+    private async Task HandleTeacherKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendTeacherMessage();
+        }
+    }
+
+    private async Task SendTeacherMessage()
+    {
+        if (string.IsNullOrWhiteSpace(teacherMessageText) || selectedStudentId == null) return;
+        
+        if (hubConnection is not null)
+        {
+            await hubConnection.InvokeAsync("SendTeacherMessage", GroupId, selectedStudentId.Value, teacherMessageText);
+            teacherMessageText = "";
+            StateHasChanged();
+        }
+    }
 
     private readonly Dictionary<StudentStatus, string> statusLabels = new()
     {
@@ -291,7 +327,7 @@
             StateHasChanged();
         });
 
-        hubConnection.On<int, int, string, DateTime, bool, bool, string>("ReceiveMessage", async (mid, sid, content, time, isProgress, isRelevant, feedback) =>
+        hubConnection.On<int, int, string, DateTime, bool, bool, string, bool>("ReceiveMessage", async (mid, sid, content, time, isProgress, isRelevant, feedback, isFromTeacher) =>
         {
             if (!students.ContainsKey(sid))
             {
@@ -312,7 +348,8 @@
                     StudentId = sid, 
                     Content = content, 
                     Timestamp = time, 
-                    IsProgressContribution = isProgress 
+                    IsProgressContribution = isProgress,
+                    IsFromTeacher = isFromTeacher
                 });
             }
             StateHasChanged();
@@ -532,20 +569,12 @@ Tvůj učitel";
     .student-monitor-card:hover {
         transform: scale(1.02);
     }
-    .bg-light-danger {
-        background-color: #fff8f8;
+    .bg-light-blue {
+        background-color: #f0f7ff;
     }
-    .flash-anim {
-        animation: flash 1s infinite;
-    }
-    .x-small {
+    .btn-xs {
+        padding: 0.1rem 0.3rem;
         font-size: 0.75rem;
-    }
-    .qr-container {
-        line-height: 0;
-    }
-    .shadow-xs {
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     @@keyframes flash {
         0% { opacity: 1; }

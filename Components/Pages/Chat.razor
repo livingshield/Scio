@@ -65,10 +65,17 @@
     <div class="chat-messages" id="chatLines">
         @foreach (var msg in messages)
         {
-            <div class="message @(msg.StudentId == student?.Id ? "own" : "") @(msg.IsSystemMessage ? "system" : "") @(msg.IsProgressContribution ? "contribution" : "") @(msg.Metadata?.IsRelevant == false ? "is-irrelevant" : "")">
+            <div class="message @(msg.StudentId == student?.Id ? "own" : "") @(msg.IsFromTeacher ? "teacher" : "") @(msg.IsSystemMessage ? "system" : "") @(msg.IsProgressContribution ? "contribution" : "") @(msg.Metadata?.IsRelevant == false ? "is-irrelevant" : "")">
                 @if (!msg.IsSystemMessage && msg.StudentId != student?.Id)
                 {
-                    <div class="sender">@(msg.Student?.Nickname ?? "Ostatní")</div>
+                    <div class="sender">
+                        <span class="bi @(msg.IsFromTeacher ? "bi-person-badge-fill" : "bi-person")"></span>
+                        @(msg.Nickname ?? "Ostatní")
+                    </div>
+                }
+                @if (msg.IsFromTeacher)
+                {
+                    <div class="teacher-tag"><span class="bi bi-mortarboard-fill"></span> Zpráva od učitele</div>
                 }
                 <div class="content">@msg.Content</div>
                 @if (msg.IsProgressContribution)
@@ -158,6 +165,7 @@
     public class ChatMessage : Message
     {
         public MessageMetadata? Metadata { get; set; }
+        public string? Nickname { get; set; }
     }
 
     public class MessageMetadata
@@ -207,9 +215,9 @@
                 .WithAutomaticReconnect()
                 .Build();
 
-            hubConnection.On<int, int, string, DateTime, bool, bool, string>("ReceiveMessage", (mid, sid, content, time, isProgress, isRelevant, feedback) =>
+            hubConnection.On<int, int, string, DateTime, bool, bool, string, bool>("ReceiveMessage", (mid, sid, content, time, isProgress, isRelevant, feedback, isFromTeacher) =>
             {
-                var senderNickname = sid == 0 ? "Systém" : (sid == student.Id ? student.Nickname : "Ostatní");
+                var senderNickname = sid == 0 ? "Systém" : (isFromTeacher ? "Učitel" : (sid == student?.Id ? student?.Nickname : "Ostatní"));
 
                 // Deduplicate
                 if (messages.Any(m => m.Id == mid && mid != 0)) return;
@@ -221,8 +229,9 @@
                     Content = content,
                     Timestamp = time,
                     IsProgressContribution = isProgress,
+                    IsFromTeacher = isFromTeacher,
                     Metadata = new MessageMetadata { IsRelevant = isRelevant, StudentFeedback = feedback },
-                    Student = new Student { Nickname = senderNickname, DeviceId = "" }
+                    Nickname = senderNickname
                 });
 
                 if (sid == student.Id)
@@ -470,6 +479,19 @@
         text-align: right;
         margin-top: 0.2rem;
         opacity: 0.6;
+    }
+    .message.teacher {
+        align-self: flex-start;
+        background: #eef7ff;
+        border-left: 4px solid #0d6efd;
+        color: #084298;
+    }
+    .teacher-tag {
+        font-size: 0.6rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+        color: #0d6efd;
     }
     .chat-input-area {
         background: white;

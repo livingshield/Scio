@@ -28,6 +28,11 @@ public class Message
     /// Zda jde o systémovou zprávu (oznámení, varování)
     /// </summary>
     public bool IsSystemMessage { get; set; } = false;
+
+    /// <summary>
+    /// Zda jde o zprávu od učitele
+    /// </summary>
+    public bool IsFromTeacher { get; set; } = false;
     
     /// <summary>
     /// Zda AI vyhodnotila zprávu jako příspěvek k cíli (zvýraznění)
