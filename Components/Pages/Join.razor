@@ -13,6 +13,16 @@
         <h1>Připojit se k výuce</h1>
         <p>Zadejte svou přezdívku a kód skupiny</p>
 
+        <AuthorizeView>
+            <Authorized>
+                <div class="alert alert-warning small py-2 mb-3">
+                    <span class="bi bi-exclamation-triangle-fill"></span>
+                    Jste přihlášen jako učitel (@context.User.Identity?.Name).
+                    <a href="auth/logout" class="text-danger fw-bold ml-1">Odhlásit se</a>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
         @if (!string.IsNullOrEmpty(errorMessage))
         {
             <div class="alert alert-danger">@errorMessage</div>

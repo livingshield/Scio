@@ -24,9 +24,18 @@
     </nav>
 
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <div>
-            <h1 class="h3 mb-1">@group?.Name</h1>
-            <p class="text-muted mb-0"><strong>Cíl:</strong> @group?.GoalDescription</p>
+        <div class="d-flex align-items-center gap-3">
+            <div>
+                <h1 class="h3 mb-1">@group?.Name</h1>
+                <p class="text-muted mb-0"><strong>Cíl:</strong> @group?.GoalDescription</p>
+            </div>
+            <AuthorizeView>
+                <Authorized>
+                    <span class="badge bg-light text-dark border py-2 px-3">
+                        <span class="bi bi-person-badge mr-1"></span> Učíte: <strong>@context.User.Identity?.Name</strong>
+                    </span>
+                </Authorized>
+            </AuthorizeView>
         </div>
         <div class="text-end d-flex align-items-center gap-3">
             <div>
@@ -282,26 +291,41 @@
             StateHasChanged();
         });
 
-        hubConnection.On<int, int, string, DateTime, bool, bool, string>("ReceiveMessage", (mid, sid, content, time, isProgress, isRelevant, feedback) =>
+        hubConnection.On<int, int, string, DateTime, bool, bool, string>("ReceiveMessage", async (mid, sid, content, time, isProgress, isRelevant, feedback) =>
         {
+            if (!students.ContainsKey(sid))
+            {
+                // New student message from someone not in our initial list
+                await RefreshStudents();
+            }
+
             if (students.TryGetValue(sid, out var s))
             {
                 s.LastActivityAt = DateTime.UtcNow;
-                
-                // Deduplicate: check if message with this ID already exists
-                if (!allMessages.Any(m => m.Id == mid && mid != 0))
-                {
-                    allMessages.Add(new Message { 
-                        Id = mid, 
-                        StudentId = sid, 
-                        Content = content, 
-                        Timestamp = time, 
-                        IsProgressContribution = isProgress 
-                    });
-                }
-                StateHasChanged();
             }
+                
+            // Deduplicate: check if message with this ID already exists
+            if (!allMessages.Any(m => m.Id == mid && mid != 0))
+            {
+                allMessages.Add(new Message { 
+                    Id = mid, 
+                    StudentId = sid, 
+                    Content = content, 
+                    Timestamp = time, 
+                    IsProgressContribution = isProgress 
+                });
+            }
+            StateHasChanged();
         });
+
+        hubConnection.Reconnected += async (connectionId) =>
+        {
+            // Re-join group after network drop
+            if (hubConnection is not null)
+            {
+                await hubConnection.InvokeAsync("JoinGroup", GroupId, "", "", true);
+            }
+        };
 
         hubConnection.On<int, int>("MessageApproved", (mid, sid) =>
         {

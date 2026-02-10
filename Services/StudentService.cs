@@ -46,23 +46,17 @@ public class StudentService : IStudentService
             DeviceId = deviceId,
             Status = StudentStatus.Active,
             JoinedAt = DateTime.UtcNow,
-            LastActivityAt = DateTime.UtcNow
+            LastActivityAt = DateTime.UtcNow,
+            ProgressLog = new ProgressLog
+            {
+                CurrentValue = 0,
+                TargetValue = group.TargetValue,
+                IsCompleted = false,
+                LastUpdatedAt = DateTime.UtcNow
+            }
         };
 
         _context.Students.Add(student);
-        await _context.SaveChangesAsync();
-
-        // Create initial progress log
-        var progressLog = new ProgressLog
-        {
-            StudentId = student.Id,
-            CurrentValue = 0,
-            TargetValue = group.TargetValue,
-            IsCompleted = false,
-            LastUpdatedAt = DateTime.UtcNow
-        };
-
-        _context.ProgressLogs.Add(progressLog);
         await _context.SaveChangesAsync();
 
         return (true, "Úspěšně připojeno.", student);

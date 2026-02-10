@@ -13,33 +13,27 @@
 
 <div class="chat-wrapper">
     <div class="chat-header">
-        <div class="container d-flex justify-content-between align-items-center h-100">
-            <div>
-                <h2 class="h5 mb-0">@group?.Name</h2>
-                <div class="small opacity-75">Cíl: @group?.GoalDescription</div>
-            </div>
-            <div class="text-end">
-                <div class="nickname">@student?.Nickname</div>
-                @if (group?.GoalType == GoalType.Boolean)
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <h2 class="h5 mb-0"><span class="bi bi-chat-dots-fill mr-2"></span> @group?.Name</h2>
+            <div class="d-flex align-items-center gap-2">
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="badge bg-warning text-dark border-0 p-2" style="font-size: 0.7rem;">
+                            <span class="bi bi-exclamation-triangle"></span> Testujete jako: <strong>@context.User.Identity?.Name</strong> (Učitel)
+                            <a href="auth/logout" class="text-decoration-none text-danger ml-2 fw-bold">Odhlásit</a>
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
+                @if (student != null)
                 {
-                    <div class="progress-info">
-                        @if (student?.ProgressLog?.IsCompleted == true)
-                        {
-                            <span class="text-success fw-bold">✔ Splněno</span>
-                        }
-                        else
-                        {
-                            <span class="text-warning">☐ Nesplněno</span>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <div class="progress-info">
-                        Pokrok: @(student?.ProgressLog?.CurrentValue ?? 0) / @(group?.TargetValue ?? 0)
+                    <div class="badge @(GetStatusBadgeClass(student.Status)) px-3 py-2">
+                        @statusLabels[student.Status]
                     </div>
                 }
             </div>
+        </div>
+        <div class="goal-alert">
+            <strong>Cíl:</strong> @group?.GoalDescription
         </div>
     </div>
 
@@ -60,9 +54,9 @@
     {
         <div class="progress-bar-container">
             <div class="progress" style="height: 5px;">
-                <div class="progress-bar bg-success" role="progressbar" 
-                     style="width: @(student?.ProgressLog?.Percentage ?? 0)%" 
-                     aria-valuenow="@(student?.ProgressLog?.Percentage ?? 0)" 
+                <div class="progress-bar bg-success" role="progressbar"
+                     style="width: @(student?.ProgressLog?.Percentage ?? 0)%"
+                     aria-valuenow="@(student?.ProgressLog?.Percentage ?? 0)"
                      aria-valuemin="0" aria-valuemax="100"></div>
             </div>
         </div>
@@ -110,7 +104,7 @@
                     <span class="bi bi-question-circle"></span>
                     <span class="d-none d-md-inline"> Potřebuji pomoc</span>
                 </button>
-                <textarea @bind="newMessage" @bind:event="oninput" 
+                <textarea @bind="newMessage" @bind:event="oninput"
                           class="form-control" placeholder="Napište výsledek nebo postup..." rows="2" style="resize: none;"></textarea>
                 <div class="d-flex flex-column gap-1">
                     <button class="btn btn-primary h-100 px-3" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(newMessage))">
@@ -137,11 +131,29 @@
     private bool isListening = false;
     private HubConnection? hubConnection;
     private DotNetObjectReference<Chat>? objRefContent;
-    
+
     // Watchdog
     private System.Threading.Timer? inactivityTimer;
     private bool showInactivityWarning = false;
     private DateTime lastActivityTime = DateTime.UtcNow;
+
+    private Dictionary<StudentStatus, string> statusLabels = new()
+    {
+        { StudentStatus.Active, "Aktivní" },
+        { StudentStatus.NeedHelp, "Potřebuje pomoc" },
+        { StudentStatus.Inactive, "Neaktivní" }
+    };
+
+    private string GetStatusBadgeClass(StudentStatus status)
+    {
+        return status switch
+        {
+            StudentStatus.Active => "bg-success text-white",
+            StudentStatus.NeedHelp => "bg-danger text-white",
+            StudentStatus.Inactive => "bg-secondary text-white",
+            _ => "bg-info text-white"
+        };
+    }
 
     public class ChatMessage : Message
     {
@@ -179,12 +191,12 @@
 
             // Load history
             var history = await GroupService.GetGroupMessagesAsync(GroupId);
-            messages = history.Select(m => new ChatMessage 
-            { 
-                Id = m.Id, 
-                StudentId = m.StudentId, 
-                Content = m.Content, 
-                Timestamp = m.Timestamp, 
+            messages = history.Select(m => new ChatMessage
+            {
+                Id = m.Id,
+                StudentId = m.StudentId,
+                Content = m.Content,
+                Timestamp = m.Timestamp,
                 IsProgressContribution = m.IsProgressContribution,
                 Student = m.Student,
                 IsSystemMessage = m.IsSystemMessage
@@ -198,26 +210,26 @@
             hubConnection.On<int, int, string, DateTime, bool, bool, string>("ReceiveMessage", (mid, sid, content, time, isProgress, isRelevant, feedback) =>
             {
                 var senderNickname = sid == 0 ? "Systém" : (sid == student.Id ? student.Nickname : "Ostatní");
-                
+
                 // Deduplicate
                 if (messages.Any(m => m.Id == mid && mid != 0)) return;
 
-                messages.Add(new ChatMessage 
-                { 
+                messages.Add(new ChatMessage
+                {
                     Id = mid,
-                    StudentId = sid, 
-                    Content = content, 
+                    StudentId = sid,
+                    Content = content,
                     Timestamp = time,
                     IsProgressContribution = isProgress,
                     Metadata = new MessageMetadata { IsRelevant = isRelevant, StudentFeedback = feedback },
                     Student = new Student { Nickname = senderNickname, DeviceId = "" }
                 });
-                
+
                 if (sid == student.Id)
                 {
                     ResetWatchdog();
                 }
-                
+
                 InvokeAsync(StateHasChanged);
                 ScrollToBottom();
                 JSRuntime.InvokeVoidAsync("renderMath");
@@ -243,14 +255,21 @@
             hubConnection.On<int, StudentStatus>("StatusChanged", (sid, status) => {
                 if (student != null && sid == student.Id) {
                     student.Status = status;
-                    isNeedsHelp = status == StudentStatus.NeedHelp;
-                    StateHasChanged();
+                    InvokeAsync(StateHasChanged);
                 }
             });
 
+            hubConnection.Reconnected += async (connectionId) =>
+            {
+                if (hubConnection is not null && student != null)
+                {
+                    await hubConnection.InvokeAsync("JoinGroup", GroupId, student.DeviceId, student.Nickname, false);
+                }
+            };
+
             await hubConnection.StartAsync();
             await hubConnection.InvokeAsync("JoinGroup", GroupId, deviceId, myNick, false);
-            
+
             StartWatchdog();
             
             StateHasChanged();
