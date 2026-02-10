@@ -72,23 +72,8 @@ public class ScioHub : Hub
             if (aiResult.IsProgress)
             {
                 message.IsProgressContribution = true;
-                
-                if (student.ProgressLog != null)
-                {
-                    student.ProgressLog.CurrentValue = aiResult.NewProgressValue;
-                    student.ProgressLog.LastUpdatedAt = DateTime.UtcNow;
-                    
-                    if (student.ProgressLog.CurrentValue >= student.Group.TargetValue)
-                    {
-                        student.ProgressLog.IsCompleted = true;
-                        student.ProgressLog.CompletedAt = DateTime.UtcNow;
-                        student.Status = StudentStatus.Completed;
-                    }
-
-                    // Notify all about progress update
-                    await Clients.Group($"group_{groupId}").SendAsync("ProgressUpdated", studentId, student.ProgressLog.CurrentValue);
-                    await Clients.Group($"group_{groupId}").SendAsync("StatusChanged", studentId, student.Status);
-                }
+                // DO NOT update student.ProgressLog automatically anymore. 
+                // Teacher will click "Approve" in the dashboard.
             }
 
             // Always update activity
@@ -99,12 +84,60 @@ public class ScioHub : Hub
 
         // 4. Broadcast message to all in group with AI metadata
         await Clients.Group($"group_{groupId}").SendAsync("ReceiveMessage", 
+            message.Id,
             studentId, 
             content, 
             message.Timestamp, 
             message.IsProgressContribution,
             isRelevant,
             studentFeedback);
+    }
+
+    public async Task ApproveMessage(int groupId, int messageId)
+    {
+        var message = await _context.Messages
+            .Include(m => m.Student)
+                .ThenInclude(s => s.ProgressLog)
+            .Include(m => m.Student)
+                .ThenInclude(s => s.Group)
+            .FirstOrDefaultAsync(m => m.Id == messageId);
+
+        if (message != null && message.Student?.ProgressLog != null)
+        {
+            var student = message.Student;
+            var group = student.Group;
+
+            if (message.IsProgressContribution) return; // Already approved
+
+            message.IsProgressContribution = true;
+            
+            if (group.GoalType == GoalType.Boolean)
+            {
+                student.ProgressLog.CurrentValue = group.TargetValue;
+                student.ProgressLog.IsCompleted = true;
+                student.ProgressLog.CompletedAt = DateTime.UtcNow;
+                student.Status = StudentStatus.Completed;
+            }
+            else
+            {
+                student.ProgressLog.CurrentValue += 1;
+                if (student.ProgressLog.CurrentValue >= group.TargetValue)
+                {
+                    student.ProgressLog.IsCompleted = true;
+                    student.ProgressLog.CompletedAt = DateTime.UtcNow;
+                    student.Status = StudentStatus.Completed;
+                }
+            }
+
+            student.ProgressLog.LastUpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // Notify about approval update specifically
+            await Clients.Group($"group_{groupId}").SendAsync("MessageApproved", message.Id, student.Id);
+
+            await Clients.Group($"group_{groupId}").SendAsync("ProgressUpdated", student.Id, student.ProgressLog.CurrentValue);
+            await Clients.Group($"group_{groupId}").SendAsync("StatusChanged", student.Id, student.Status);
+        }
     }
 
     public async Task UpdateProgress(int groupId, int studentId, int newValue)

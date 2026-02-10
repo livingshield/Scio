@@ -137,25 +137,34 @@
                         </div>
                         <div class="card-body overflow-auto p-0">
                             <div class="p-3 bg-light border-bottom">
-                                <div class="small fw-bold text-muted mb-1">Klíčové zprávy vedoucí k pokroku:</div>
+                                <div class="small fw-bold text-muted mb-1">Historie komunikace studenta:</div>
                             </div>
                             <div class="p-3">
                                 @{
-                                    var progressMessages = allMessages.Where(m => m.StudentId == selStudent.Id && m.IsProgressContribution).OrderByDescending(m => m.Timestamp);
-                                    if (!progressMessages.Any())
+                                    var studentMessages = allMessages.Where(m => m.StudentId == selStudent.Id).OrderByDescending(m => m.Timestamp);
+                                    if (!studentMessages.Any())
                                     {
                                         <div class="text-center py-4 text-muted small">
-                                            Zatím žádné zprávy uznané jako pokrok.
+                                            Zatím žádné zprávy od tohoto studenta.
                                         </div>
                                     }
                                     else
                                     {
                                         <div class="list-group list-group-flush">
-                                            @foreach (var m in progressMessages)
+                                            @foreach (var m in studentMessages)
                                             {
-                                                <div class="list-group-item border-start border-4 border-success mb-2 rounded bg-white shadow-xs">
+                                                <div class="list-group-item @(m.IsProgressContribution ? "border-start border-4 border-success bg-white shadow-xs" : "bg-transparent") mb-2 rounded border-light">
                                                     <div class="d-flex justify-content-between mb-1 gap-2">
-                                                        <span class="badge bg-success py-0" style="height: fit-content;">Důkaz pokroku</span>
+                                                        @if (m.IsProgressContribution)
+                                                        {
+                                                            <span class="badge bg-success py-0" style="height: fit-content;">Uznaný pokrok</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button class="btn btn-xs btn-outline-success py-0 border-0" @onclick="() => ApproveMessage(m.Id)" title="Klikněte pro uznání pokroku">
+                                                                <span class="bi bi-plus-circle"></span> Uznat jako pokrok
+                                                            </button>
+                                                        }
                                                         <small class="text-muted flex-shrink-0">@m.Timestamp.ToLocalTime().ToString("HH:mm")</small>
                                                     </div>
                                                     <div class="small text-break">@m.Content</div>
@@ -273,12 +282,33 @@
             StateHasChanged();
         });
 
-        hubConnection.On<int, string, DateTime, bool, bool, string>("ReceiveMessage", (sid, content, time, isProgress, isRelevant, feedback) =>
+        hubConnection.On<int, int, string, DateTime, bool, bool, string>("ReceiveMessage", (mid, sid, content, time, isProgress, isRelevant, feedback) =>
         {
             if (students.TryGetValue(sid, out var s))
             {
                 s.LastActivityAt = DateTime.UtcNow;
-                allMessages.Add(new Message { StudentId = sid, Content = content, Timestamp = time, IsProgressContribution = isProgress });
+                
+                // Deduplicate: check if message with this ID already exists
+                if (!allMessages.Any(m => m.Id == mid && mid != 0))
+                {
+                    allMessages.Add(new Message { 
+                        Id = mid, 
+                        StudentId = sid, 
+                        Content = content, 
+                        Timestamp = time, 
+                        IsProgressContribution = isProgress 
+                    });
+                }
+                StateHasChanged();
+            }
+        });
+
+        hubConnection.On<int, int>("MessageApproved", (mid, sid) =>
+        {
+            var msg = allMessages.FirstOrDefault(m => m.Id == mid);
+            if (msg != null)
+            {
+                msg.IsProgressContribution = true;
                 StateHasChanged();
             }
         });
@@ -390,6 +420,32 @@ Tvůj učitel";
         finally
         {
             isSendingEmail = false;
+        }
+    }
+
+    private async Task MarkStatus(int studentId, StudentStatus status)
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, studentId, status == StudentStatus.NeedHelp);
+            // This is a bit of a hack since SignalNeedHelp only takes bool. 
+            // In a real app we'd have a specialized "SetStatus" method.
+        }
+    }
+
+    private async Task ApproveMessage(int messageId)
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.InvokeAsync("ApproveMessage", GroupId, messageId);
+            
+            // Local update for immediate feedback
+            var msg = allMessages.FirstOrDefault(m => m.Id == messageId);
+            if (msg != null)
+            {
+                msg.IsProgressContribution = true;
+                StateHasChanged();
+            }
         }
     }
 

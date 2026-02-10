@@ -110,11 +110,12 @@
                     <span class="bi bi-question-circle"></span>
                     <span class="d-none d-md-inline"> Potřebuji pomoc</span>
                 </button>
-                <textarea @bind="newMessage" @bind:event="oninput" @onkeydown="HandleKeyDown" 
+                <textarea @bind="newMessage" @bind:event="oninput" 
                           class="form-control" placeholder="Napište výsledek nebo postup..." rows="2" style="resize: none;"></textarea>
                 <div class="d-flex flex-column gap-1">
-                    <button class="btn btn-primary h-100" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(newMessage))" title="Odeslat">
-                        <span class="bi bi-send"></span>
+                    <button class="btn btn-primary h-100 px-3" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(newMessage))">
+                        <span class="bi bi-send d-block d-md-inline"></span>
+                        <span class="fw-bold">Odeslat</span>
                     </button>
                     <button class="btn btn-outline-secondary btn-sm" @onclick="StartVoice" title="Diktovat hlasem">
                         <span class="bi bi-mic-fill @(isListening ? "text-danger" : "")"></span>
@@ -192,12 +193,16 @@
                 .WithAutomaticReconnect()
                 .Build();
 
-            hubConnection.On<int, string, DateTime, bool, bool, string>("ReceiveMessage", (sid, content, time, isProgress, isRelevant, feedback) =>
+            hubConnection.On<int, int, string, DateTime, bool, bool, string>("ReceiveMessage", (mid, sid, content, time, isProgress, isRelevant, feedback) =>
             {
                 var senderNickname = sid == 0 ? "Systém" : (sid == student.Id ? student.Nickname : "Ostatní");
                 
+                // Deduplicate
+                if (messages.Any(m => m.Id == mid && mid != 0)) return;
+
                 messages.Add(new ChatMessage 
                 { 
+                    Id = mid,
                     StudentId = sid, 
                     Content = content, 
                     Timestamp = time,
@@ -214,6 +219,16 @@
                 InvokeAsync(StateHasChanged);
                 ScrollToBottom();
                 JSRuntime.InvokeVoidAsync("renderMath");
+            });
+
+            hubConnection.On<int, int>("MessageApproved", (mid, sid) =>
+            {
+                var msg = messages.FirstOrDefault(m => m.Id == mid);
+                if (msg != null)
+                {
+                    msg.IsProgressContribution = true;
+                    InvokeAsync(StateHasChanged);
+                }
             });
 
             hubConnection.On<int, int>("ProgressUpdated", (sid, val) => {
