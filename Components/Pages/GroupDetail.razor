@@ -6,9 +6,12 @@
 @using ScioApp.Services
 @attribute [Authorize]
 @inject IGroupService GroupService
+@inject IEmailService EmailService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
+@inject HttpClient HttpClient
 @implements IAsyncDisposable
+@using System.Net.Http
 
 <PageTitle>Sledování výuky - Scio</PageTitle>
 
@@ -28,7 +31,10 @@
         <div class="text-end d-flex align-items-center gap-3">
             <div>
                 <div class="h5 mb-0">Kod pro studenty: <span class="badge bg-primary fs-5">@group?.InviteCode</span></div>
-                <div class="small text-muted">Aktivní monitoring probíhá</div>
+                <div class="small text-muted mb-2">Aktivní monitoring probíhá</div>
+                <button class="btn btn-outline-primary btn-sm px-3" @onclick="ShowEmailModal">
+                    <span class="bi bi-envelope-plus"></span> Odeslat pozvánku e-mailem
+                </button>
             </div>
             <div class="qr-container bg-white p-1 border rounded shadow-sm">
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=@(Uri.EscapeDataString(NavigationManager.BaseUri + "join/" + group?.InviteCode))" 
@@ -167,6 +173,55 @@
     }
 </div>
 
+@if (isEmailModalVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5); z-index: 1050;">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><span class="bi bi-send-fill mr-2"></span> Odeslat pozvánku studentům</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideEmailModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">E-mailové adresy studentů (oddělujte středníkem `;` )</label>
+                        <input type="text" class="form-control" @bind="emailRecipients" placeholder="jan@skola.cz; petr@skola.cz" />
+                        <div class="form-text">Adresy oddělte středníkem. QR kód bude automaticky přiložen jako soubor .jpg.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Předmět e-mailu</label>
+                        <input type="text" class="form-control" @bind="emailSubject" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Obsah e-mailu (HTML náhled)</label>
+                        <textarea class="form-control font-monospace" @bind="emailBody" rows="10" style="font-size: 0.85rem; background: #f8f9fa; border: 1px solid #dee2e6;"></textarea>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(emailStatus))
+                    {
+                        <div class="alert @(emailStatus.StartsWith("Chyba") ? "alert-danger" : "alert-success") py-2 mt-3">
+                            <span class="bi @(emailStatus.StartsWith("Chyba") ? "bi-exclamation-octagon" : "bi-check-circle")"></span> @emailStatus
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-secondary px-4" @onclick="HideEmailModal" disabled="@isSendingEmail">Zavřít</button>
+                    <button type="button" class="btn btn-primary px-4" @onclick="SendEmails" disabled="@(string.IsNullOrEmpty(emailRecipients) || isSendingEmail)">
+                        @if (isSendingEmail)
+                        {
+                            <span class="spinner-border spinner-border-sm mr-2" role="status"></span> <span>Odesílám...</span>
+                        }
+                        else
+                        {
+                            <span class="bi bi-send"></span> <span>Odeslat vše</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter] public int GroupId { get; set; }
 
@@ -176,6 +231,14 @@
     private int? selectedStudentId;
     private bool isLoading = true;
     private HubConnection? hubConnection;
+
+    // Email fields
+    private bool isEmailModalVisible = false;
+    private bool isSendingEmail = false;
+    private string emailRecipients = "";
+    private string emailSubject = "";
+    private string emailBody = "";
+    private string emailStatus = "";
 
     private readonly Dictionary<StudentStatus, string> statusLabels = new()
     {
@@ -245,6 +308,74 @@
     private void SelectStudent(int id)
     {
         selectedStudentId = id;
+    }
+
+    private void ShowEmailModal()
+    {
+        emailStatus = "";
+        emailSubject = $"Pozvánka ke spolupráci: {group?.Name}";
+        
+        var joinUrl = $"{NavigationManager.BaseUri}join/{group?.InviteCode}";
+        emailBody = $@"<html>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+    <h2 style='color: #0d6efd;'>Ahoj, připoj se do skupiny {group?.Name}!</h2>
+    <p>Právě jsem založil(a) novou aktivitu v aplikaci Scio. Tvým cílem je:</p>
+    <div style='background: #f8f9fa; padding: 15px; border-left: 5px solid #0d6efd; margin: 15px 0;'>
+        <strong>{group?.GoalDescription}</strong>
+    </div>
+    <p>Do skupiny se připojíš kliknutím na tento odkaz:</p>
+    <p><a href='{joinUrl}' style='display: inline-block; padding: 10px 20px; background: #0d6efd; color: white; text-decoration: none; border-radius: 5px;'>PŘIPOJIT SE K AKTIVITĚ</a></p>
+    <p>Nebo využij přiložený QR kód v příloze e-mailu.</p>
+    <p>Těším se na tvou práci!<br>Tvůj učitel</p>
+</body>
+</html>";
+        isEmailModalVisible = true;
+    }
+
+    private void HideEmailModal() => isEmailModalVisible = false;
+
+    private async Task SendEmails()
+    {
+        if (string.IsNullOrWhiteSpace(emailRecipients)) return;
+
+        isSendingEmail = true;
+        emailStatus = "";
+        StateHasChanged();
+
+        try
+        {
+            // Prepare QR code data
+            var qrUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(NavigationManager.BaseUri + "join/" + group?.InviteCode)}";
+            byte[]? qrBytes = null;
+            
+            try 
+            {
+                qrBytes = await HttpClient.GetByteArrayAsync(qrUrl);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"QR code download failed: {ex.Message}");
+            }
+
+            await EmailService.SendEmailAsync(
+                emailRecipients, 
+                emailSubject, 
+                emailBody, 
+                $"pozvanka_qr_{group?.InviteCode}.jpg", 
+                qrBytes);
+            
+            emailStatus = "E-maily byly úspěšně odeslány všem studentům!";
+            await Task.Delay(2000);
+            HideEmailModal();
+        }
+        catch (Exception ex)
+        {
+            emailStatus = $"Chyba při odesílání: {ex.Message}";
+        }
+        finally
+        {
+            isSendingEmail = false;
+        }
     }
 
     private async Task ResolveHelp(int studentId)
