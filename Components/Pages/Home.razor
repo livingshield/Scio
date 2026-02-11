@@ -17,7 +17,7 @@
                 <h1 class="h2 fw-800 mb-1 text-slate-900">Moje skupiny</h1>
                 <p class="text-muted mb-0">Správa vašich aktivních tříd a výuky</p>
             </div>
-            <button class="btn btn-primary px-4 py-2 shadow-sm d-flex align-items-center gap-2" @onclick="ShowCreateModal">
+            <button class="btn btn-primary px-4 py-2 shadow-sm d-flex align-items-center gap-2" @onclick="ShowCreateModal" style="position: relative; z-index: 10;">
                 <span class="bi bi-plus-lg"></span>
                 <span class="fw-bold">Nová skupina</span>
             </button>
@@ -91,49 +91,51 @@
 
 @if (isModalVisible)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 1050;">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="glass-card modal-content border-0 p-2 overflow-hidden shadow-2xl">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="fw-800 mb-0 text-slate-900">Nová skupina</h5>
-                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <EditForm Model="@newGroup" OnValidSubmit="HandleCreateGroup">
-                        <DataAnnotationsValidator />
-                        
-                        <div class="mb-3">
-                            <label class="form-label x-small fw-bold text-muted uppercase-title">Název skupiny</label>
-                            <InputText @bind-Value="newGroup.Name" class="form-control" placeholder="např. 8.A - Matematika 1" />
-                            <ValidationMessage For="@(() => newGroup.Name)" class="x-small mt-1 text-danger" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label x-small fw-bold text-muted uppercase-title">Popis cíle výuky</label>
-                            <InputTextArea @bind-Value="newGroup.GoalDescription" class="form-control" placeholder="Co mají studenti vyřešit? Např. vyřešit 5 rovnic..." rows="3" style="resize: none;" />
-                            <ValidationMessage For="@(() => newGroup.GoalDescription)" class="x-small mt-1 text-danger" />
-                        </div>
-
-                        <div class="row g-3">
-                            <div class="col-6">
-                                <label class="form-label x-small fw-bold text-muted uppercase-title">Typ hodnocení</label>
-                                <InputSelect @bind-Value="newGroup.GoalType" class="form-select">
-                                    <option value="@GoalType.Boolean">Splněno / Ne</option>
-                                    <option value="@GoalType.Percentage">Procenta</option>
-                                </InputSelect>
+    <div class="modal-wrapper" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; overflow-y: auto;">
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); min-height: 100vh;">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="glass-card modal-content border-0 p-2 overflow-hidden shadow-2xl bg-white">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="fw-800 mb-0 text-slate-900">Nová skupina</h5>
+                        <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <EditForm Model="@newGroup" OnValidSubmit="HandleCreateGroup">
+                            <DataAnnotationsValidator />
+                            
+                            <div class="mb-3">
+                                <label class="form-label x-small fw-bold text-muted uppercase-title">Název skupiny</label>
+                                <InputText @bind-Value="newGroup.Name" class="form-control" placeholder="např. 8.A - Matematika 1" />
+                                <ValidationMessage For="@(() => newGroup.Name)" class="x-small mt-1 text-danger" />
                             </div>
-                            <div class="col-6">
-                                <label class="form-label x-small fw-bold text-muted uppercase-title">Cílová hodnota</label>
-                                <InputNumber @bind-Value="newGroup.TargetValue" class="form-control" />
-                                <ValidationMessage For="@(() => newGroup.TargetValue)" class="x-small mt-1 text-danger" />
-                            </div>
-                        </div>
 
-                        <div class="modal-footer border-0 px-0 pb-0 mt-4">
-                            <button type="button" class="btn btn-light px-4" @onclick="HideCreateModal">Zrušit</button>
-                            <button type="submit" class="btn btn-primary px-5 shadow-sm">Vytvořit</button>
-                        </div>
-                    </EditForm>
+                            <div class="mb-3">
+                                <label class="form-label x-small fw-bold text-muted uppercase-title">Popis cíle výuky</label>
+                                <InputTextArea @bind-Value="newGroup.GoalDescription" class="form-control" placeholder="Co mají studenti vyřešit? Např. vyřešit 5 rovnic..." rows="3" style="resize: none;" />
+                                <ValidationMessage For="@(() => newGroup.GoalDescription)" class="x-small mt-1 text-danger" />
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <label class="form-label x-small fw-bold text-muted uppercase-title">Typ hodnocení</label>
+                                    <InputSelect @bind-Value="newGroup.GoalType" class="form-select">
+                                        <option value="@GoalType.Boolean">Splněno / Ne</option>
+                                        <option value="@GoalType.Percentage">Procenta</option>
+                                    </InputSelect>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label x-small fw-bold text-muted uppercase-title">Cílová hodnota</label>
+                                    <InputNumber @bind-Value="newGroup.TargetValue" class="form-control" />
+                                    <ValidationMessage For="@(() => newGroup.TargetValue)" class="x-small mt-1 text-danger" />
+                                </div>
+                            </div>
+
+                            <div class="modal-footer border-0 px-0 pb-0 mt-4">
+                                <button type="button" class="btn btn-light px-4" @onclick="HideCreateModal">Zrušit</button>
+                                <button type="submit" class="btn btn-primary px-5 shadow-sm">Vytvořit</button>
+                            </div>
+                        </EditForm>
+                    </div>
                 </div>
             </div>
         </div>
@@ -169,8 +171,17 @@
         groups = await GroupService.GetTeacherGroupsAsync(currentUserId);
     }
 
-    private void ShowCreateModal() => isModalVisible = true;
-    private void HideCreateModal() => isModalVisible = false;
+    private void ShowCreateModal() 
+    {
+        isModalVisible = true;
+        StateHasChanged();
+    }
+    
+    private void HideCreateModal() 
+    {
+        isModalVisible = false;
+        StateHasChanged();
+    }
 
     private async Task HandleCreateGroup()
     {

@@ -242,6 +242,22 @@ else if (student != null)
             var deviceId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "scio_device_id");
             var myNick = await JSRuntime.InvokeAsync<string>("localStorage.getItem", $"scio_group_{GroupId}_nick");
 
+            // Fallback to query string if local storage is not yet synced (race condition fix)
+            var uri = new Uri(NavigationManager.Uri);
+            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+            if (string.IsNullOrEmpty(myNick) && query.TryGetValue("nick", out var nickFromQuery))
+            {
+                myNick = nickFromQuery;
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"scio_group_{GroupId}_nick", myNick);
+            }
+
+            if (string.IsNullOrEmpty(deviceId) && query.TryGetValue("device", out var deviceFromQuery))
+            {
+                deviceId = deviceFromQuery;
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "scio_device_id", deviceId);
+            }
+
             if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(myNick))
             {
                 NavigationManager.NavigateTo($"join/{GroupId}");

@@ -117,12 +117,15 @@
         try
         {
             var deviceId = await GetOrCreateDeviceId();
-            var result = await StudentService.JoinGroupAsync(InviteCode, Nickname, deviceId);
+            var result = await StudentService.JoinGroupAsync(InviteCode.Trim().ToUpper(), Nickname.Trim(), deviceId);
 
             if (result.Success && result.Student != null)
             {
+                // Save info to local storage for persistence
                 await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"scio_group_{result.Student.GroupId}_nick", result.Student.Nickname);
-                NavigationManager.NavigateTo($"chat/{result.Student.GroupId}");
+                
+                // Navigate with identifiers as backup in case local storage sync is slow (race condition fix)
+                NavigationManager.NavigateTo($"chat/{result.Student.GroupId}?nick={Uri.EscapeDataString(result.Student.Nickname)}&device={deviceId}");
             }
             else
             {
