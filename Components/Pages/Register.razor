@@ -1,117 +1,94 @@
 @page "/register"
-@rendermode InteractiveServer
 @using ScioApp.Services
+@using ScioApp.Models
 @inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Registrace - Scio</PageTitle>
 
-<div class="auth-container px-3 fade-in">
-    <div class="auth-card glass-card">
-        <div class="text-center mb-4">
-            <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3 shadow-sm" style="width: 60px; height: 60px;">
-                <span class="bi bi-person-plus-fill h3 mb-0"></span>
+<div class="container min-vh-100 d-flex align-items-center justify-content-center py-5 fade-in">
+    <div class="glass-card p-5 w-100" style="max-width: 480px;">
+        <div class="text-center mb-5">
+            <div class="bg-primary-custom rounded-pill d-inline-flex align-items-center justify-content-center mb-4 shadow-lg" style="width: 70px; height: 70px;">
+                <span class="bi bi-person-plus text-white h2 mb-0"></span>
             </div>
-            <h1>Vytvořit účet</h1>
-            <p>Zaregistrujte se jako učitel a začněte učit moderně</p>
+            <h1 class="fw-bold h3">Vytvořit účet</h1>
+            <p class="text-muted">Staňte se součástí komunity Scio</p>
         </div>
 
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <div class="alert alert-danger border-0 rounded-3 small mb-4 fade-in">
-                <span class="bi bi-x-circle-fill me-2"></span> @errorMessage
+            <div class="alert alert-danger border-0 small py-3 mb-4 rounded-3 d-flex gap-3">
+                <span class="bi bi-exclamation-circle-fill fs-4 mt-1"></span>
+                <div>
+                   <div class="fw-bold">Chyba registrace</div>
+                   <div class="opacity-75">@errorMessage</div>
+                </div>
             </div>
         }
 
-        <EditForm Model="@registerModel" OnValidSubmit="HandleRegistration">
+        <EditForm Model="@registerModel" OnValidSubmit="HandleRegister">
             <DataAnnotationsValidator />
             
-            <div class="form-group mb-3">
-                <label class="x-small fw-bold text-muted uppercase-title mb-1">Jméno a příjmení</label>
-                <InputText id="name" @bind-Value="registerModel.Name" class="form-control border-0 bg-light py-2" placeholder="např. Jan Novák" />
-                <ValidationMessage For="@(() => registerModel.Name)" class="x-small text-danger mt-1" />
+            <div class="mb-3">
+                <label class="form-label small fw-bold text-muted">CELÉ JMÉNO</label>
+                <InputText @bind-Value="registerModel.Name" class="form-control form-control-custom" placeholder="Jan Novák" />
+                <ValidationMessage For="@(() => registerModel.Name)" class="text-danger small mt-1" />
             </div>
 
-            <div class="form-group mb-3">
-                <label class="x-small fw-bold text-muted uppercase-title mb-1">Uživatelské jméno</label>
-                <InputText id="login" @bind-Value="registerModel.Login" class="form-control border-0 bg-light py-2" placeholder="jnovak" />
-                <ValidationMessage For="@(() => registerModel.Login)" class="x-small text-danger mt-1" />
+            <div class="mb-3">
+                <label class="form-label small fw-bold text-muted">EMAIL</label>
+                <InputText @bind-Value="registerModel.Email" class="form-control form-control-custom" placeholder="jan.novak@skola.cz" />
+                <ValidationMessage For="@(() => registerModel.Email)" class="text-danger small mt-1" />
             </div>
 
-            <div class="form-group mb-3">
-                <label class="x-small fw-bold text-muted uppercase-title mb-1">Emailová adresa</label>
-                <InputText id="email" @bind-Value="registerModel.Email" class="form-control border-0 bg-light py-2" placeholder="jan.novak@skola.cz" />
-                <ValidationMessage For="@(() => registerModel.Email)" class="x-small text-danger mt-1" />
+            <div class="mb-3">
+                <label class="form-label small fw-bold text-muted">UŽIVATELSKÉ JMÉNO</label>
+                <InputText @bind-Value="registerModel.Username" class="form-control form-control-custom" placeholder="jannovak" />
+                <ValidationMessage For="@(() => registerModel.Username)" class="text-danger small mt-1" />
             </div>
 
-            <div class="form-group mb-4">
-                <label class="x-small fw-bold text-muted uppercase-title mb-1">Heslo</label>
-                <InputText id="password" type="password" @bind-Value="registerModel.Password" class="form-control border-0 bg-light py-2" placeholder="********" />
-                <ValidationMessage For="@(() => registerModel.Password)" class="x-small text-danger mt-1" />
+            <div class="mb-4">
+                <label class="form-label small fw-bold text-muted">HESLO</label>
+                <InputText @bind-Value="registerModel.Password" type="password" class="form-control form-control-custom" placeholder="Minimálně 6 znaků" />
+                <ValidationMessage For="@(() => registerModel.Password)" class="text-danger small mt-1" />
             </div>
 
-            <button type="submit" class="btn btn-primary w-100 py-3 shadow-md fw-bold" disabled="@isSubmitting">
-                @if (isSubmitting)
+            <button type="submit" class="btn btn-primary-custom w-100 py-3 mb-4" disabled="@isBusy">
+                @if (isBusy)
                 {
-                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    <span class="spinner-border spinner-border-sm me-2"></span>
                     <span>Probíhá registrace...</span>
                 }
                 else
                 {
-                    <span>Zaregistrovat se</span>
+                    <span>Vytvořit účet</span>
                 }
             </button>
-        </EditForm>
 
-        <div class="text-center mt-4">
-            <span class="text-muted small">Již máte účet?</span> 
-            <a href="login" class="fw-bold text-primary small text-decoration-none ms-1">Přihlásit se</a>
-        </div>
+            <div class="text-center">
+                <p class="text-muted small">Již máte účet? <a href="login" class="text-primary fw-bold text-decoration-none">Přihlaste se</a></p>
+            </div>
+        </EditForm>
     </div>
 </div>
 
+<style>
+    .bg-primary-custom { background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); }
+</style>
+
 @code {
-    private RegisterModel registerModel = new();
-    private string? errorMessage;
-    private bool isSubmitting = false;
+    private ScioApp.Models.RegisterRequest registerModel = new();
+    private string errorMessage = "";
+    private bool isBusy = false;
 
-    private async Task HandleRegistration()
+    private async Task HandleRegister()
     {
-        isSubmitting = true;
-        errorMessage = null;
-
-        var result = await AuthService.RegisterTeacherAsync(
-            registerModel.Login, 
-            registerModel.Email, 
-            registerModel.Name, 
-            registerModel.Password);
-
-        if (result.Success)
-        {
-            NavigationManager.NavigateTo("login?registered=true");
-        }
-        else
-        {
-            errorMessage = result.Message;
-        }
-
-        isSubmitting = false;
-    }
-
-    public class RegisterModel
-    {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Povinné")]
-        public string Name { get; set; } = "";
-
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Povinné")]
-        public string Login { get; set; } = "";
-
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Povinné")]
-        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Neplatný email")]
-        public string Email { get; set; } = "";
-
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Povinné")]
-        [System.ComponentModel.DataAnnotations.MinLength(6, ErrorMessage = "Min. 6 znaků")]
-        public string Password { get; set; } = "";
+        isBusy = true;
+        errorMessage = "";
+        var result = await AuthService.RegisterTeacherAsync(registerModel.Username, registerModel.Email, registerModel.Name, registerModel.Password);
+        if (result.Success) { NavigationManager.NavigateTo("login"); }
+        else { errorMessage = result.Message; }
+        isBusy = false;
     }
 }

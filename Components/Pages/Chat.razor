@@ -9,126 +9,112 @@
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
-<PageTitle>@group?.Name - Scio</PageTitle>
+<PageTitle>Chat - @group?.Name</PageTitle>
 
 @if (isLoading)
 {
-    <div class="d-flex justify-content-center align-items-center" style="height: 100vh; background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);">
-        <div class="text-center fade-in">
-            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
-            <div class="h5 text-muted fw-light">Připravujeme učebnu...</div>
-        </div>
+    <div class="min-vh-100 d-flex flex-column align-items-center justify-content-center text-center">
+        <div class="spinner-border text-primary mb-4" style="width: 4rem; height: 4rem;" role="status"></div>
+        <h4 class="fw-bold">Připojování k výuce...</h4>
+        <p class="text-muted">Navazování spojení se serverem</p>
     </div>
 }
 else if (student != null)
 {
-    <div class="chat-wrapper fade-in">
-        <header class="chat-header glass-card m-2">
-            <div class="container-fluid d-flex justify-content-between align-items-center py-2 px-3">
+    <div class="d-flex flex-column" style="height: 100vh;">
+        <!-- Header -->
+        <header class="p-3 border-bottom border-white-10 glass-card mx-2 mt-2 rounded-4 mb-2">
+            <div class="container-fluid d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-3">
-                    <div class="header-icon bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px;">
-                        <span class="bi bi-chat-heart-fill"></span>
+                    <div class="bg-primary-custom rounded-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                        <span class="bi bi-chat-dots-fill text-white fs-4"></span>
                     </div>
                     <div>
-                        <h1 class="h6 mb-0 fw-bold text-truncate" style="max-width: 200px;">@group?.Name</h1>
-                        <div class="small text-muted d-flex align-items-center gap-1">
-                            <span class="status-dot @(hubConnection?.State == HubConnectionState.Connected ? "connected" : "disconnected")"></span>
-                            @(hubConnection?.State == HubConnectionState.Connected ? "Online" : "Odpojeno")
+                        <h1 class="h6 mb-0 fw-bold">@group?.Name</h1>
+                        <div class="small d-flex align-items-center gap-2">
+                            <span class="status-dot @(hubConnection?.State == HubConnectionState.Connected ? "bg-success" : "bg-danger")"></span>
+                            <span class="text-muted">@(hubConnection?.State == HubConnectionState.Connected ? "Online" : "Odpojeno")</span>
                         </div>
                     </div>
                 </div>
-                <div class="header-actions">
-                    <div class="badge bg-white text-dark shadow-sm d-flex align-items-center gap-2 py-2 px-3 border-0">
-                        <span class="bi bi-person-circle text-primary"></span>
-                        <span>@student.Nickname</span>
-                    </div>
+                <div class="badge bg-white-5 border border-white-10 text-primary py-2 px-3 rounded-pill fw-medium">
+                    <span class="bi bi-person-fill me-1"></span> @student.Nickname
                 </div>
             </div>
         </header>
 
-        <main class="chat-main container-fluid pb-3 h-100 overflow-hidden">
+        <main class="flex-grow-1 overflow-hidden p-2">
             <div class="row h-100 g-3">
-                <!-- Sidebar -->
-                <div class="col-lg-4 col-md-5 d-none d-md-flex flex-column h-100 overflow-auto pb-5">
-                    <div class="goal-sidebar glass-card p-4">
-                        <div class="d-flex align-items-center gap-2 mb-3">
-                            <span class="bi bi-star-fill text-warning"></span>
-                            <h2 class="h6 mb-0 fw-bold uppercase-title">Tvůj úkol</h2>
-                        </div>
-                        <div class="goal-box p-3 rounded-4 bg-white border border-light mb-4 shadow-sm">
-                            <p class="mb-0 small text-dark leading-relaxed">@group?.GoalDescription</p>
+                <!-- Sidebar (Goal & Progress) -->
+                <div class="col-lg-4 d-none d-lg-flex flex-column h-100">
+                    <div class="glass-card p-4 h-100 overflow-auto">
+                        <div class="section-label mb-3">INSTRUKCE K ÚKOLU</div>
+                        <div class="p-3 rounded-3 bg-white-5 border-start border-primary border-4 mb-4">
+                            <p class="mb-0 small text-light leading-relaxed">@group?.GoalDescription</p>
                         </div>
 
-                        <div class="progress-section mt-4">
-                            <div class="d-flex justify-content-between align-items-end mb-2">
-                                <span class="small fw-bold text-muted">Tvůj pokrok</span>
-                                <span class="h4 mb-0 text-primary fw-700">@((int)(student.ProgressLog?.Percentage ?? 0))%</span>
+                        <div class="section-label mb-3">VÁŠ AKTUÁLNÍ POKROK</div>
+                        <div class="progress-box p-4 rounded-4 bg-white-5 border border-white-10">
+                            <div class="d-flex justify-content-between align-items-end mb-3">
+                                <span class="small text-muted fw-bold">STAV PLNĚNÍ:</span>
+                                <span class="h2 mb-0 fw-bold text-primary">@((int)(student.ProgressLog?.Percentage ?? 0))%</span>
                             </div>
                             
                             @if (group?.GoalType == GoalType.Boolean)
                             {
-                                <div class="boolean-goal text-center p-3 rounded-4 @(student.ProgressLog?.IsCompleted == true ? "bg-success-light border-success" : "bg-light border") border-2 transition-all">
+                                <div class="text-center p-3 rounded-3 border @(student.ProgressLog?.IsCompleted == true ? "border-success bg-success-soft" : "border-white-10")">
                                     @if (student.ProgressLog?.IsCompleted == true)
                                     {
-                                        <div class="text-success scale-up"><span class="bi bi-check-circle-fill h1"></span></div>
-                                        <div class="fw-bold text-success">Skvělá práce! Splněno!</div>
+                                        <div class="text-success"><span class="bi bi-check-circle-fill h1"></span></div>
+                                        <div class="fw-bold text-success">Úkol splněn!</div>
                                     }
                                     else
                                     {
-                                        <div class="text-muted opacity-50"><span class="bi bi-circle h1"></span></div>
-                                        <div class="text-muted fw-medium">Zatím se pracuje...</div>
+                                        <div class="text-muted opacity-25"><span class="bi bi-circle h1"></span></div>
+                                        <div class="text-muted fw-medium">Zatím nesplněno</div>
                                     }
                                 </div>
                             }
                             else
                             {
-                                <div class="progress mb-2 shadow-xs" style="height: 12px; border-radius: 10px;">
-                                    <div class="progress-bar @(student.ProgressLog?.IsCompleted == true ? "bg-success" : "bg-primary") progress-bar-striped progress-bar-animated" 
+                                <div class="progress mb-3 bg-dark border border-white-10" style="height: 12px; border-radius: 6px;">
+                                    <div class="progress-bar bg-primary-custom progress-bar-striped progress-bar-animated" 
                                          role="progressbar" 
-                                         style="width: @(student.ProgressLog?.Percentage ?? 0)%" 
-                                         aria-valuenow="@(student.ProgressLog?.Percentage ?? 0)" aria-valuemin="0" aria-valuemax="100"></div>
+                                         style="width: @(student.ProgressLog?.Percentage ?? 0)%"></div>
                                 </div>
-                                <div class="text-center x-small text-muted">
-                                    Dosáhl jsi <strong>@(student.ProgressLog?.CurrentValue ?? 0)</strong> z <strong>@(group?.TargetValue ?? 0)</strong>
+                                <div class="text-center small text-muted">
+                                    Dosáhl jste <span class="text-primary fw-bold">@(student.ProgressLog?.CurrentValue ?? 0)</span> z <span class="text-primary fw-bold">@(group?.TargetValue ?? 0)</span> jednotek.
                                 </div>
                             }
                         </div>
 
-                        <div class="mt-4 pt-4 border-top">
-                            <button class="btn w-100 @(isNeedsHelp ? "btn-danger" : "btn-outline-danger") d-flex align-items-center justify-content-center gap-2" @onclick="ToggleHelp">
-                                <span class="bi @(isNeedsHelp ? "bi-heart-pulse-fill flash-anim" : "bi-question-circle")"></span>
-                                @(isNeedsHelp ? "Čekám na pomoc..." : "Potřebuji pomoct")
+                        <div class="mt-auto pt-4 border-top border-white-10">
+                            <button class="btn @(isNeedsHelp ? "btn-danger" : "btn-outline-danger") w-100 py-3 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2" @onclick="ToggleHelp">
+                                <span class="bi @(isNeedsHelp ? "bi-broadcast-pin" : "bi-question-circle") fs-5"></span>
+                                @(isNeedsHelp ? "ŽÁDOST O POMOC JE AKTIVNÍ" : "POTŘEBUJI POMOC")
                             </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Chat Area -->
-                <div class="col-lg-8 col-md-7 d-flex flex-column h-100 overflow-hidden pb-5">
-                    <div class="messages-area glass-card d-flex flex-column h-100 overflow-hidden">
-                        <div id="chatLines" class="messages-list flex-grow-1 p-3 overflow-auto d-flex flex-column gap-3">
+                <div class="col-lg-8 d-flex flex-column h-100 overflow-hidden">
+                    <div class="glass-card d-flex flex-column h-100 overflow-hidden">
+                        <!-- Messages -->
+                        <div id="chatLines" class="flex-grow-1 p-3 overflow-auto d-flex flex-column gap-3">
                             @foreach (var msg in messages)
                             {
                                 var isOwn = msg.StudentId == student.Id;
-                                <div class="message-row d-flex @(isOwn ? "justify-content-end" : "justify-content-start") fade-in">
-                                    <div class="message-bubble @(msg.IsFromTeacher ? "teacher" : (isOwn ? "own" : (msg.StudentId == 0 ? "system" : "other"))) @(msg.IsProgressContribution ? "contribution" : "") @(msg.Metadata?.IsRelevant == false ? "is-irrelevant" : "") shadow-xs">
-                                        @if (!isOwn && msg.StudentId != 0)
-                                        {
-                                            <div class="bubble-sender d-flex align-items-center gap-1">
-                                                @if (msg.IsFromTeacher)
-                                                {
-                                                    <span class="bi bi-mortarboard-fill text-primary"></span>
-                                                }
-                                                @msg.Nickname
-                                            </div>
-                                        }
+                                <div class="d-flex @(isOwn ? "justify-content-end" : "justify-content-start") fade-in">
+                                    <div class="message-bubble @(msg.IsFromTeacher ? "bg-purple-soft" : (isOwn ? "bg-primary-soft" : "bg-white-5")) @(msg.IsProgressContribution ? "border-success-shine" : "")">
+                                        <div class="message-meta d-flex justify-content-between align-items-center mb-1">
+                                            <span class="small fw-bold @(isOwn ? "text-primary" : (msg.IsFromTeacher ? "text-purple" : "text-muted"))">
+                                                @(isOwn ? "Vy" : (msg.IsFromTeacher ? "Učitel" : msg.Nickname))
+                                            </span>
+                                            <span class="opacity-50" style="font-size: 0.7rem;">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
+                                        </div>
                                         
-                                        @if (msg.IsFromTeacher)
-                                        {
-                                            <div class="teacher-tag"><span class="bi bi-stars"></span> Zpráva od učitele</div>
-                                        }
-
-                                        <div class="bubble-content">
+                                        <div class="message-content">
                                             @if (msg.Content.Contains("$") || msg.Content.Contains("\\"))
                                             {
                                                 <div class="math-container">@((MarkupString)msg.Content)</div>
@@ -139,18 +125,17 @@ else if (student != null)
                                             }
                                         </div>
 
-                                        <div class="bubble-footer d-flex justify-content-between align-items-center gap-3">
-                                            @if (msg.IsProgressContribution)
-                                            {
-                                                <span class="contribution-badge"><span class="bi bi-patch-check-fill"></span> Pokrok</span>
-                                            }
-                                            <span class="bubble-time">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
-                                        </div>
+                                        @if (msg.IsProgressContribution)
+                                        {
+                                            <div class="badge bg-success-soft text-success small border border-success mt-2 d-inline-block">
+                                                <span class="bi bi-star-fill me-1"></span> Tato zpráva vedla k pokroku
+                                            </div>
+                                        }
 
                                         @if (msg.Metadata != null && !string.IsNullOrEmpty(msg.Metadata.StudentFeedback))
                                         {
-                                            <div class="ai-feedback mt-2 border-top pt-1">
-                                                <span class="bi bi-info-circle"></span> @msg.Metadata.StudentFeedback
+                                            <div class="mt-2 p-2 rounded-3 bg-white-5 border-start border-primary italic small opacity-75">
+                                                <span class="bi bi-robot text-primary me-1"></span> @msg.Metadata.StudentFeedback
                                             </div>
                                         }
                                     </div>
@@ -158,25 +143,26 @@ else if (student != null)
                             }
                         </div>
                         
-                        <div class="input-area p-3 bg-white border-top shadow-lg" style="z-index: 10;">
+                        <!-- Input -->
+                        <div class="p-3 border-top border-white-10 bg-black-20">
                             @if (showInactivityWarning)
                             {
-                                <div class="alert alert-warning py-1 px-3 mb-2 rounded-3 border-0 x-small text-center fade-in">
-                                    <span class="bi bi-clock-history"></span> Pár minut už jsi nic nenapsal(a). Pracuješ na úkolu?
+                                <div class="alert alert-warning py-2 mb-3 small d-flex align-items-center gap-2 fade-in">
+                                    <span class="bi bi-alarm"></span> Detekována neaktivita. Pracujete stále na úkolu?
                                 </div>
                             }
                             <div class="d-flex gap-2 align-items-end">
-                                <button class="btn btn-light rounded-circle shadow-xs" @onclick="StartVoice" title="Diktovat" style="width: 42px; height: 42px; padding: 0;">
-                                    <span class="bi bi-mic-fill @(isListening ? "text-danger scale-up" : "text-primary")"></span>
+                                <button class="btn btn-outline-light rounded-circle shadow-sm" @onclick="StartVoice" style="width: 48px; height: 48px; flex-shrink: 0;">
+                                    <span class="bi bi-mic @(isListening ? "text-danger" : "")"></span>
                                 </button>
                                 <div class="flex-grow-1">
                                     <textarea id="chatInput" @bind="newMessage" @bind:event="oninput" @onkeydown="@HandleKeyDown"
-                                              class="form-control border-0 bg-light py-2" rows="1" 
-                                              placeholder="Napiš své řešení..."
-                                              style="resize: none; border-radius: 12px;"></textarea>
+                                              class="form-control form-control-custom" rows="1" 
+                                              placeholder="Napište zprávu..."
+                                              style="resize: none;"></textarea>
                                 </div>
-                                <button class="btn btn-primary rounded-circle shadow-sm" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(newMessage))" style="width: 42px; height: 42px; padding: 0;">
-                                    <span class="bi bi-send-fill"></span>
+                                <button class="btn btn-primary-custom rounded-circle shadow-sm" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(newMessage))" style="width: 48px; height: 48px; flex-shrink: 0;">
+                                    <span class="bi bi-send-fill text-white"></span>
                                 </button>
                             </div>
                         </div>
@@ -187,8 +173,30 @@ else if (student != null)
     </div>
 }
 
+<style>
+    .section-label { font-size: 0.75rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.5px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .bg-white-5 { background: rgba(255, 255, 255, 0.05); }
+    .bg-black-20 { background: rgba(0, 0, 0, 0.2); }
+    .bg-primary-soft { background: rgba(0, 210, 255, 0.1); border: 1px solid rgba(0, 210, 255, 0.2); }
+    .bg-purple-soft { background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); }
+    .text-purple { color: #a855f7; }
+    .bg-success-soft { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); }
+    .border-success-shine { border-color: #22c55e !important; box-shadow: 0 0 10px rgba(34, 197, 94, 0.2); }
+    .border-white-10 { border-color: rgba(255, 255, 255, 0.1) !important; }
+    
+    .message-bubble {
+        max-width: 85%;
+        padding: 12px 16px;
+        border-radius: 16px;
+        position: relative;
+    }
+</style>
+
 @code {
     [Parameter] public int GroupId { get; set; }
+    [SupplyParameterFromQuery] public string? Nick { get; set; }
+    [SupplyParameterFromQuery] public string? Device { get; set; }
 
     private Group? group;
     private Student? student;
@@ -200,28 +208,9 @@ else if (student != null)
     private DotNetObjectReference<Chat>? objRefContent;
     private bool isLoading = true;
 
-    // Watchdog
     private System.Threading.Timer? inactivityTimer;
     private bool showInactivityWarning = false;
     private DateTime lastActivityTime = DateTime.UtcNow;
-
-    private Dictionary<StudentStatus, string> statusLabels = new()
-    {
-        { StudentStatus.Active, "Aktivní" },
-        { StudentStatus.NeedHelp, "Potřebuje pomoc" },
-        { StudentStatus.Inactive, "Neaktivní" }
-    };
-
-    private string GetStatusBadgeClass(StudentStatus status)
-    {
-        return status switch
-        {
-            StudentStatus.Active => "bg-primary text-white",
-            StudentStatus.NeedHelp => "bg-danger text-white flash-anim",
-            StudentStatus.Inactive => "bg-secondary text-white",
-            _ => "bg-info text-white"
-        };
-    }
 
     public class ChatMessage : Message
     {
@@ -242,354 +231,67 @@ else if (student != null)
             var deviceId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "scio_device_id");
             var myNick = await JSRuntime.InvokeAsync<string>("localStorage.getItem", $"scio_group_{GroupId}_nick");
 
-            // Fallback to query string if local storage is not yet synced (race condition fix)
-            var uri = new Uri(NavigationManager.Uri);
-            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
-
-            if (string.IsNullOrEmpty(myNick) && query.TryGetValue("nick", out var nickFromQuery))
+            if (string.IsNullOrEmpty(myNick) && !string.IsNullOrEmpty(Nick))
             {
-                myNick = nickFromQuery;
+                myNick = Nick;
                 await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"scio_group_{GroupId}_nick", myNick);
             }
-
-            if (string.IsNullOrEmpty(deviceId) && query.TryGetValue("device", out var deviceFromQuery))
+            if (string.IsNullOrEmpty(deviceId) && !string.IsNullOrEmpty(Device))
             {
-                deviceId = deviceFromQuery;
+                deviceId = Device;
                 await JSRuntime.InvokeVoidAsync("localStorage.setItem", "scio_device_id", deviceId);
             }
 
             if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(myNick))
             {
-                NavigationManager.NavigateTo($"join/{GroupId}");
+                NavigationManager.NavigateTo($"vstup/{GroupId}");
                 return;
             }
 
             student = await StudentService.GetStudentByNicknameAndDeviceAsync(GroupId, myNick, deviceId);
-            if (student == null)
-            {
-                NavigationManager.NavigateTo($"join/{GroupId}");
-                return;
-            }
+            if (student == null) { NavigationManager.NavigateTo($"vstup/{GroupId}"); return; }
 
             group = student.Group;
             isNeedsHelp = student.Status == StudentStatus.NeedHelp;
 
-            // Load history
             var history = await GroupService.GetGroupMessagesAsync(GroupId);
-            messages = history.Select(m => new ChatMessage
-            {
-                Id = m.Id,
-                StudentId = m.StudentId,
-                Content = m.Content,
-                Timestamp = m.Timestamp,
-                IsProgressContribution = m.IsProgressContribution,
-                IsFromTeacher = m.IsFromTeacher,
+            messages = history.Select(m => new ChatMessage {
+                Id = m.Id, StudentId = m.StudentId, Content = m.Content, Timestamp = m.Timestamp,
+                IsProgressContribution = m.IsProgressContribution, IsFromTeacher = m.IsFromTeacher,
                 Nickname = m.StudentId == 0 ? "Systém" : (m.IsFromTeacher ? "Učitel" : m.Student?.Nickname),
-                Student = m.Student,
-                IsSystemMessage = m.IsSystemMessage
+                Student = m.Student, IsSystemMessage = m.IsSystemMessage
             }).ToList();
 
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(NavigationManager.ToAbsoluteUri("sciohub"))
-                .WithAutomaticReconnect()
-                .Build();
+                .WithAutomaticReconnect().Build();
 
-            hubConnection.On<int, int, string, DateTime, bool, bool, string, bool>("ReceiveMessage", (mid, sid, content, time, isProgress, isRelevant, feedback, isFromTeacher) =>
+            hubConnection.On<int, int, string, DateTime, bool, bool, string, bool>("ReceiveMessage", (mid, sid, content, time, isProgress, isRelevant, feedback, isTeacher) =>
             {
-                var senderNickname = sid == 0 ? "Systém" : (isFromTeacher ? "Učitel" : (sid == student?.Id ? student?.Nickname : "Ostatní"));
-
-                // Deduplicate
                 if (messages.Any(m => m.Id == mid && mid != 0)) return;
-
-                messages.Add(new ChatMessage
-                {
-                    Id = mid,
-                    StudentId = sid,
-                    Content = content,
-                    Timestamp = time,
-                    IsProgressContribution = isProgress,
-                    IsFromTeacher = isFromTeacher,
-                    Metadata = new MessageMetadata { IsRelevant = isRelevant, StudentFeedback = feedback },
-                    Nickname = senderNickname
-                });
-
-                if (sid == student?.Id)
-                {
-                    ResetWatchdog();
-                }
-
-                InvokeAsync(StateHasChanged);
-                ScrollToBottom();
-                JSRuntime.InvokeVoidAsync("renderMath");
+                var nick = sid == 0 ? "Systém" : (isTeacher ? "Učitel" : (sid == student?.Id ? student?.Nickname : "Spolužák"));
+                messages.Add(new ChatMessage { Id = mid, StudentId = sid, Content = content, Timestamp = time, IsProgressContribution = isProgress, IsFromTeacher = isTeacher, Metadata = new MessageMetadata { IsRelevant = isRelevant, StudentFeedback = feedback }, Nickname = nick });
+                if (sid == student?.Id) ResetWatchdog(); InvokeAsync(StateHasChanged); ScrollToBottom(); JSRuntime.InvokeVoidAsync("renderMath");
             });
 
-            hubConnection.On<int, int>("MessageApproved", (mid, sid) =>
-            {
-                var msg = messages.FirstOrDefault(m => m.Id == mid);
-                if (msg != null)
-                {
-                    msg.IsProgressContribution = true;
-                    InvokeAsync(StateHasChanged);
-                }
-            });
-
-            hubConnection.On<int, int>("ProgressUpdated", (sid, val) => {
-                if (student != null && sid == student.Id && student.ProgressLog != null) {
-                    student.ProgressLog.CurrentValue = val;
-                    InvokeAsync(StateHasChanged);
-                }
-            });
-
-            hubConnection.On<int, StudentStatus>("StatusChanged", (sid, status) => {
-                if (student != null && sid == student.Id) {
-                    student.Status = status;
-                    isNeedsHelp = status == StudentStatus.NeedHelp;
-                    InvokeAsync(StateHasChanged);
-                }
-            });
-
-            hubConnection.Reconnected += async (connectionId) =>
-            {
-                if (hubConnection is not null && student != null)
-                {
-                    await hubConnection.InvokeAsync("JoinGroup", GroupId, student.DeviceId, student.Nickname, false);
-                }
-            };
+            hubConnection.On<int, int>("ProgressUpdated", (sid, val) => { if (student != null && sid == student.Id && student.ProgressLog != null) { student.ProgressLog.CurrentValue = val; InvokeAsync(StateHasChanged); } });
+            hubConnection.On<int, StudentStatus>("StatusChanged", (sid, status) => { if (student != null && sid == student.Id) { student.Status = status; isNeedsHelp = status == StudentStatus.NeedHelp; InvokeAsync(StateHasChanged); } });
 
             await hubConnection.StartAsync();
             await hubConnection.InvokeAsync("JoinGroup", GroupId, deviceId, myNick, false);
-
-            StartWatchdog();
-            
-            isLoading = false;
-            StateHasChanged();
-            ScrollToBottom();
+            StartWatchdog(); isLoading = false; StateHasChanged(); ScrollToBottom();
         }
     }
 
-    private void StartWatchdog()
-    {
-        inactivityTimer = new System.Threading.Timer(WatchdogCheck, null, 10000, 10000);
-    }
+    private void StartWatchdog() => inactivityTimer = new System.Threading.Timer((_) => WatchdogCheck(), null, 10000, 10000);
+    private void ResetWatchdog() { lastActivityTime = DateTime.UtcNow; showInactivityWarning = false; }
+    private async void WatchdogCheck() { var inactive = (DateTime.UtcNow - lastActivityTime).TotalSeconds; bool warn = inactive > 180; if (warn != showInactivityWarning) { showInactivityWarning = warn; await InvokeAsync(StateHasChanged); } }
 
-    private void ResetWatchdog()
-    {
-        lastActivityTime = DateTime.UtcNow;
-        showInactivityWarning = false;
-    }
-
-    private async void WatchdogCheck(object? state)
-    {
-        var inactiveSeconds = (DateTime.UtcNow - lastActivityTime).TotalSeconds;
-        
-        bool shouldWarn = inactiveSeconds > 180; // 3 minutes
-        bool shouldMarkInactive = inactiveSeconds > 300; // 5 minutes
-
-        if (shouldMarkInactive && student?.Status != StudentStatus.Inactive)
-        {
-            if (hubConnection?.State == HubConnectionState.Connected)
-            {
-                // await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, student?.Id, false); 
-            }
-        }
-
-        if (shouldWarn != showInactivityWarning)
-        {
-            showInactivityWarning = shouldWarn;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task SendMessage()
-    {
-        if (string.IsNullOrWhiteSpace(newMessage) || student == null || hubConnection == null) return;
-
-        var content = newMessage;
-        newMessage = "";
-
-        await hubConnection.InvokeAsync("SendMessage", GroupId, student.Id, content);
-    }
-
-    private async Task HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !e.ShiftKey)
-        {
-            await SendMessage();
-        }
-    }
-
-    private async Task ToggleHelp()
-    {
-        if (student == null || hubConnection == null) return;
-        isNeedsHelp = !isNeedsHelp;
-        await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, student.Id, isNeedsHelp);
-    }
-
-    private void ScrollToBottom()
-    {
-        JSRuntime.InvokeVoidAsync("scrollToBottom", "chatLines");
-    }
-
-    private async Task StartVoice()
-    {
-        isListening = true;
-        objRefContent = DotNetObjectReference.Create(this);
-        await JSRuntime.InvokeVoidAsync("startVoiceRecognition", objRefContent);
-    }
-
-    [JSInvokable]
-    public void OnVoiceResult(string text)
-    {
-        newMessage += (string.IsNullOrEmpty(newMessage) ? "" : " ") + text;
-        isListening = false;
-        StateHasChanged();
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        objRefContent?.Dispose();
-        inactivityTimer?.Dispose();
-        if (hubConnection is not null)
-        {
-            await hubConnection.DisposeAsync();
-        }
-    }
+    private async Task SendMessage() { if (string.IsNullOrWhiteSpace(newMessage) || student == null || hubConnection == null) return; var content = newMessage; newMessage = ""; await hubConnection.InvokeAsync("SendMessage", GroupId, student.Id, content); }
+    private async Task HandleKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter" && !e.ShiftKey) await SendMessage(); }
+    private async Task ToggleHelp() { if (student == null || hubConnection == null) return; isNeedsHelp = !isNeedsHelp; await hubConnection.InvokeAsync("SignalNeedHelp", GroupId, student.Id, isNeedsHelp); }
+    private void ScrollToBottom() => JSRuntime.InvokeVoidAsync("scrollToBottom", "chatLines");
+    private async Task StartVoice() { isListening = true; objRefContent = DotNetObjectReference.Create(this); await JSRuntime.InvokeVoidAsync("startVoiceRecognition", objRefContent); }
+    [JSInvokable] public void OnVoiceResult(string text) { newMessage += (string.IsNullOrEmpty(newMessage) ? "" : " ") + text; isListening = false; StateHasChanged(); }
+    public async ValueTask DisposeAsync() { objRefContent?.Dispose(); inactivityTimer?.Dispose(); if (hubConnection != null) await hubConnection.DisposeAsync(); }
 }
-
-<style>
-    .chat-wrapper {
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-    }
-
-    .chat-header {
-        z-index: 100;
-    }
-
-    .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        display: inline-block;
-    }
-    .status-dot.connected { background-color: var(--secondary); box-shadow: 0 0 5px var(--secondary); }
-    .status-dot.disconnected { background-color: #ef4444; }
-
-    .uppercase-title {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--text-light);
-    }
-
-    .messages-list {
-        background: transparent;
-        scrollbar-gutter: stable;
-    }
-
-    .message-bubble {
-        max-width: 85%;
-        padding: 0.75rem 1rem;
-        border-radius: 1.25rem;
-        position: relative;
-        font-size: 0.925rem;
-        line-height: 1.4;
-    }
-
-    .message-bubble.own {
-        background: var(--primary);
-        color: white;
-        border-bottom-right-radius: 0.25rem;
-        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
-    }
-
-    .message-bubble.other {
-        background: white;
-        color: var(--text-main);
-        border-bottom-left-radius: 0.25rem;
-        box-shadow: var(--shadow-sm);
-    }
-
-    .message-bubble.teacher {
-        background: #f0f7ff;
-        border: 1px solid #bae6fd;
-        border-bottom-left-radius: 0.25rem;
-        color: #0369a1;
-    }
-
-    .message-bubble.system {
-        background: rgba(0,0,0,0.05);
-        color: var(--text-muted);
-        font-size: 0.8rem;
-        border-radius: 0.75rem;
-        text-align: center;
-        align-self: center;
-        padding: 0.4rem 1rem;
-    }
-
-    .message-bubble.contribution {
-        border: 2px solid var(--secondary);
-    }
-
-    .bubble-sender {
-        font-size: 0.75rem;
-        font-weight: 700;
-        margin-bottom: 0.25rem;
-        opacity: 0.9;
-    }
-
-    .teacher-tag {
-        font-size: 0.65rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        color: var(--primary);
-        margin-bottom: 0.25rem;
-    }
-
-    .bubble-footer {
-        margin-top: 0.4rem;
-        font-size: 0.7rem;
-        opacity: 0.7;
-    }
-
-    .bubble-time {
-        font-weight: 500;
-    }
-
-    .contribution-badge {
-        color: var(--secondary);
-        font-weight: 700;
-        font-size: 0.65rem;
-        display: flex;
-        align-items: center;
-        gap: 0.2rem;
-    }
-
-    .own .contribution-badge { color: #86efac; }
-    .own .bubble-footer { opacity: 0.8; }
-
-    .ai-feedback {
-        font-size: 0.8rem;
-        font-style: italic;
-        color: var(--primary);
-    }
-
-    .is-irrelevant {
-        opacity: 0.6;
-        filter: grayscale(0.5);
-    }
-
-    .bg-success-light { background-color: #f0fdf4; }
-
-    .scale-up {
-        animation: scaleUp 0.3s ease-out;
-    }
-    @@keyframes scaleUp {
-        from { transform: scale(0.8); }
-        to { transform: scale(1); }
-    }
-
-    .fw-700 { font-weight: 700; }
-</style>

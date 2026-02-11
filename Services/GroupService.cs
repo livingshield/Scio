@@ -13,6 +13,8 @@ public interface IGroupService
     Task<bool> UpdateGroupAsync(Group group);
     Task<bool> DeleteGroupAsync(int groupId);
     Task<List<Message>> GetGroupMessagesAsync(int groupId, int limit = 50);
+    Task<List<Student>> GetGroupStudentsAsync(int groupId);
+    Task<List<Message>> GetStudentMessagesAsync(int studentId);
 }
 
 public class GroupService : IGroupService
@@ -89,5 +91,26 @@ public class GroupService : IGroupService
         _context.Groups.Remove(group);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<List<Student>> GetGroupStudentsAsync(int groupId)
+    {
+        return await _context.Students
+            .Include(s => s.ProgressLog)
+            .Where(s => s.GroupId == groupId)
+            .OrderBy(s => s.Nickname)
+            .ToListAsync();
+    }
+
+    public async Task<List<Message>> GetStudentMessagesAsync(int studentId)
+    {
+        return await _context.Messages
+            .Where(m => m.StudentId == studentId || (m.IsFromTeacher && _context.Messages.Any(dm => dm.Id == m.Id && dm.StudentId == studentId)))
+            // Note: In a real app teacher messages might need better filtering, 
+            // but for this MVP we'll take messages marked as from teacher that belong to this group link.
+            // Actually, Message has StudentId even if from teacher (the target student).
+            .Where(m => m.StudentId == studentId)
+            .OrderBy(m => m.Timestamp)
+            .ToListAsync();
     }
 }

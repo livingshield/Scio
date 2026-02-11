@@ -1,0 +1,127 @@
+@page "/vstup/{InviteCode?}"
+@namespace ScioApp.Components.Pages
+@rendermode InteractiveServer
+@using System
+@using ScioApp.Services
+@using ScioApp.Models
+@inject IStudentService StudentService
+@inject IGroupService GroupService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Vstup do výuky - Scio</PageTitle>
+
+<div class="container min-vh-100 d-flex align-items-center justify-content-center py-5 fade-in">
+    <div class="glass-card p-5 w-100 shadow-2xl" style="max-width: 520px; border: 1px solid rgba(255,255,255,0.1);">
+        <div class="text-center mb-5">
+            <div class="bg-primary-custom rounded-circle d-inline-flex align-items-center justify-content-center mb-4 shadow-lg" style="width: 88px; height: 88px;">
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
+            <h1 class="h2 mb-2 text-white fw-800">Vstup do výuky</h1>
+            <p class="text-muted fs-6">Připojte se ke své skupině během okamžiku</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger border-0 small py-3 mb-4 rounded-4 d-flex gap-3 bg-danger-subtle text-danger">
+                <span class="bi bi-x-circle-fill fs-4 mt-1"></span>
+                <div>
+                   <div class="fw-bold fs-6">Chyba vstupu</div>
+                   <div class="opacity-75">@errorMessage</div>
+                </div>
+            </div>
+        }
+
+        <div class="mb-4">
+            <label class="form-label small fw-bold text-muted uppercase-title mb-2">PŘÍSTUPOVÝ KÓD</label>
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0 border-white-10 text-primary p-3">
+                    <span class="bi bi-hash fs-5"></span>
+                </span>
+                <input type="text" @bind="InviteCode" class="form-control form-control-custom border-start-0" placeholder="Zadejte kód od učitele" />
+            </div>
+        </div>
+
+        <div class="mb-5">
+            <label class="form-label small fw-bold text-muted uppercase-title mb-2">VAŠE PŘEZDÍVKA</label>
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0 border-white-10 text-primary p-3">
+                    <span class="bi bi-person-circle fs-5"></span>
+                </span>
+                <input type="text" @bind="nickname" class="form-control form-control-custom border-start-0" placeholder="Např. Honza M." />
+            </div>
+        </div>
+
+        <button class="btn btn-primary-custom w-100 py-3 fs-5" @onclick="HandleJoin" disabled="@isJoining">
+            @if (isJoining)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                <span>Ověřování...</span>
+            }
+            else
+            {
+                <span class="bi bi-door-open-fill me-2"></span>
+                <span>PŘIPOJIT SE K VÝUCE</span>
+            }
+        </button>
+        
+        <div class="text-center mt-5">
+            <p class="small text-muted mb-0 fw-medium opacity-50">Scio &bull; Interaktivní vzdělávací systém</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-primary-custom { background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); }
+    .border-white-10 { border-color: rgba(255, 255, 255, 0.1) !important; }
+    .uppercase-title { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; color: var(--text-muted) !important; }
+    .fw-800 { font-weight: 800; }
+</style>
+
+@code {
+    [Parameter] public string? InviteCode { get; set; }
+    private string nickname = "";
+    private string errorMessage = "";
+    private bool isJoining = false;
+
+    private async Task HandleJoin()
+    {
+        if (string.IsNullOrWhiteSpace(InviteCode)) { errorMessage = "Zadejte prosím kód skupiny."; return; }
+        if (string.IsNullOrWhiteSpace(nickname)) { errorMessage = "Zadejte svou přezdívku."; return; }
+
+        isJoining = true;
+        errorMessage = "";
+
+        var code = InviteCode.Trim().ToUpper();
+        var deviceId = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "scio_device_id");
+        if (string.IsNullOrEmpty(deviceId))
+        {
+            deviceId = Guid.NewGuid().ToString();
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "scio_device_id", deviceId);
+        }
+
+        var result = await StudentService.JoinGroupAsync(code, nickname, deviceId);
+        if (result.Success)
+        {
+            var g = await GroupService.GetGroupByInviteCodeAsync(code);
+            if (g != null)
+            {
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"scio_group_{g.Id}_nick", nickname);
+                NavigationManager.NavigateTo($"chat/{g.Id}?nick={Uri.EscapeDataString(nickname)}&device={deviceId}");
+            }
+            else
+            {
+                errorMessage = "Skupina byla nalezena, ale nepodařilo se načíst její detaily. Zkuste to prosím znovu.";
+            }
+        }
+        else
+        {
+            errorMessage = result.Message;
+        }
+
+        isJoining = false;
+    }
+}

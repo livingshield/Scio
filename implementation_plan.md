@@ -9,7 +9,7 @@ Tento dokument slouží jako detailní plán a záznam o implementaci aplikace p
   * *Důvod:* Požadavek na realtime funkcionalitu (SignalR je integrovaný), C# na obou koncích zjednodušuje vývoj.
 * **Databáze:** Microsoft SQL Server (Entity Framework Core)
   * *Strategie:* Prefix `Scio_` pro všechny tabulky (vyhnutí se konfliktům s existujícími tabulkami)
-* **Styling:** Tailwind CSS (pro rychlý a moderní design) + Sass (pro specifické úpravy)
+* **Styling:** Vanilla CSS (Sleek Dark Premium Theme) - deep navy backgrounds, glassmorphism, clean typography ('Inter' font), and professional Czech terminology.
 * **AI Integrace:** OpenAI API / Azure OpenAI (nebo lokální model, pokud bude k dispozici) pro analýzu textu a vyhodnocování cílů.
 * **Autentifikace:**
   * *Fáze 1:* Klasická autentifikace (Login/Heslo + BCrypt)
@@ -181,9 +181,10 @@ Tento dokument slouží jako detailní plán a záznam o implementaci aplikace p
    * Notifikace pro učitele
 
 8. **Polish:**
-   * Tailwind CSS styling
-   * Responsivní design
-   * Loading states a error handling
+   * Elegant Dark Premium (Vanilla CSS)
+   * Responsivní design pro mobilní telefony
+   * Plynulé animace a skleněné efekty
+   * Čistá česká terminologie (bez žargonu)
    * Watchdog timer pro neaktivitu
 
 9. **Deployment:**

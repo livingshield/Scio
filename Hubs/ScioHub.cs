@@ -131,8 +131,9 @@ public class ScioHub : Hub
         {
             var student = message.Student;
             var group = student.Group;
+            if (group == null) return;
 
-            if (message.IsProgressContribution) return; // Already approved
+            if (message.IsProgressContribution) return;
 
             message.IsProgressContribution = true;
             

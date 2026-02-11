@@ -4,72 +4,79 @@
 <div class="page d-flex flex-column min-vh-100">
     <AuthorizeView>
         <Authorized>
-            <header class="top-navbar glass-card m-2 mb-0 px-4 py-2 d-flex justify-content-between align-items-center shadow-sm">
-                <div class="d-flex align-items-center gap-3">
-                    <a href="" class="navbar-brand-custom">
-                        <div class="logo-box bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm">
-                            <span class="bi bi-mortarboard-fill"></span>
+            <nav class="navbar navbar-expand-md navbar-dark navbar-custom py-3 px-4 shadow-2xl">
+                <div class="container-fluid">
+                    <a class="navbar-brand d-flex align-items-center" href="/scio/">
+                        <div class="bg-primary-custom rounded-4 p-2 me-3 shadow-lg" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                                <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+                            </svg>
                         </div>
-                        <span class="brand-text fw-800 text-slate-900 ms-2">Scio</span>
+                        <span class="fw-bold fs-2 text-white" style="letter-spacing: -1.5px;">Scio</span>
                     </a>
-                    <nav class="d-none d-md-flex gap-4 ms-4">
-                        <NavLink class="nav-link-custom" href="" Match="NavLinkMatch.All">Dashboard</NavLink>
-                    </nav>
-                </div>
-                <div class="d-flex align-items-center gap-3">
-                    <div class="user-info d-none d-sm-block text-end">
-                        <div class="x-small fw-bold text-muted uppercase-title">Učitel</div>
-                        <div class="small fw-700 text-slate-800">@context.User.Identity?.Name</div>
+                    
+                    <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+
+                    <div class="collapse navbar-collapse" id="navbarContent">
+                        <ul class="navbar-nav me-auto mb-2 mb-md-0 ms-md-5 gap-2">
+                            <li class="nav-item">
+                                <NavLink class="nav-link-custom d-flex align-items-center gap-2" href="" Match="NavLinkMatch.All">
+                                    <span class="bi bi-grid-1x2-fill"></span>
+                                    <span>NÁSTĚNKA</span>
+                                </NavLink>
+                            </li>
+                        </ul>
+                        <div class="d-flex align-items-center gap-4">
+                            <div class="text-end d-none d-lg-block">
+                                <div class="small text-muted fw-bold uppercase-title" style="font-size: 0.65rem;">PŘIHLÁŠEN JAKO</div>
+                                <div class="fw-bold text-white">@context.User.Identity?.Name</div>
+                            </div>
+                            <div class="vr bg-white opacity-10 d-none d-lg-block" style="height: 30px;"></div>
+                            <a href="auth/logout" class="btn btn-outline-danger btn-sm px-4 py-2 rounded-pill fw-bold border-2 d-flex align-items-center gap-2 transition-all">
+                                <span class="bi bi-power"></span>
+                                <span>ODHLÁSIT</span>
+                            </a>
+                        </div>
                     </div>
-                    <a href="auth/logout" class="btn btn-light-danger btn-sm rounded-3 px-3 fw-bold x-small">
-                        <span class="bi bi-box-arrow-right"></span> Odhlásit
-                    </a>
                 </div>
-            </header>
+            </nav>
         </Authorized>
     </AuthorizeView>
 
-    <main class="flex-grow-1 overflow-hidden">
-        <div class="h-100 overflow-auto">
+    <main class="flex-grow-1">
+        <div class="container-fluid">
             @Body
         </div>
     </main>
+
+    <footer class="py-5 text-center border-top border-white-10 mt-5">
+        <div class="container">
+            <p class="text-muted small mb-0 fw-medium">
+                &copy; @DateTime.Now.Year <span class="text-white fw-bold">Scio</span> &bull; 
+                Inteligentní systém pro monitorování vzdělávacího pokroku
+            </p>
+        </div>
+    </footer>
 </div>
 
-<div id="blazor-error-ui" class="glass-card shadow-lg p-3 m-3 position-fixed bottom-0 start-0 z-3 d-none">
-    <span class="text-danger fw-bold"><span class="bi bi-exclamation-octagon"></span> Nastala chyba.</span>
-    <a href="." class="reload btn btn-sm btn-primary ms-3">Obnovit</a>
-    <span class="dismiss ms-3 cursor-pointer">🗙</span>
+<div id="blazor-error-ui" class="glass-card p-4 m-4 position-fixed bottom-0 start-0 z-3 border-danger shadow-2xl" style="display:none">
+    <div class="d-flex align-items-center gap-3">
+        <span class="bi bi-exclamation-octagon-fill text-danger fs-3"></span>
+        <div class="flex-grow-1">
+            <div class="fw-bold text-white">Nastala neočekávaná chyba</div>
+            <div class="small text-muted">Aplikace se může chovat nestandardně.</div>
+        </div>
+        <a href="" class="reload btn btn-danger rounded-pill px-4 fw-bold">Restartovat</a>
+        <span class="dismiss cursor-pointer opacity-50 ms-2">✕</span>
+    </div>
 </div>
 
 <style>
-    .navbar-brand-custom {
-        display: flex;
-        align-items: center;
-        text-decoration: none;
-    }
-    .logo-box { width: 32px; height: 32px; font-size: 1rem; }
-    .brand-text { font-size: 1.25rem; letter-spacing: -0.02em; }
-    
-    .nav-link-custom {
-        color: var(--text-muted);
-        font-weight: 600;
-        font-size: 0.9rem;
-        text-decoration: none;
-        padding: 0.5rem 0;
-        border-bottom: 2px solid transparent;
-        transition: all 0.2s;
-    }
-    .nav-link-custom:hover, .nav-link-custom.active {
-        color: var(--primary);
-        border-bottom-color: var(--primary);
-    }
-    
-    .cursor-pointer { cursor: pointer; }
-    
-    .h-screen-100 { height: 100vh; }
-    
-    /* Blazor Default Cleanup */
-    .top-row { display: none !important; }
-    .sidebar { display: none !important; }
+    .uppercase-title { letter-spacing: 0.1em; }
+    .transition-all { transition: all 0.3s ease; }
+    .bg-white-5 { background: rgba(255, 255, 255, 0.05); }
+    .bg-primary-custom { background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%); }
 </style>
