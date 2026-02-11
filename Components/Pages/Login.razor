@@ -1,4 +1,5 @@
 @page "/login"
+@rendermode InteractiveServer
 @using ScioApp.Services
 @using ScioApp.Models
 @using Microsoft.AspNetCore.Authentication
@@ -56,7 +57,7 @@
                 <span>PŘIHLÁSIT SE</span>
             </button>
 
-            <div class="hr-text text-muted mb-4 opacity-50"><span>NEBO</span></div>
+            <div class="hr-text text-muted mb-4"><span>NEBO</span></div>
 
             <button type="button" class="btn btn-outline-light w-100 py-3 d-flex align-items-center justify-content-center gap-3 rounded-4 mb-4 border-white-10" @onclick="LoginWithGoogle">
                 <svg width="20" height="20" viewBox="0 0 24 24">
@@ -86,5 +87,5 @@
     [SupplyParameterFromQuery]
     public string? Error { get; set; }
 
-    private void LoginWithGoogle() => NavigationManager.NavigateTo("auth/google-login", true);
+    private void LoginWithGoogle() => NavigationManager.NavigateTo("/scio/auth/google-login", true);
 }

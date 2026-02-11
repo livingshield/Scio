@@ -6,6 +6,7 @@
 @using ScioApp.Services
 @attribute [Authorize]
 @inject IGroupService GroupService
+@inject IStudentService StudentService
 @inject IEmailService EmailService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
@@ -71,11 +72,23 @@
                     {
                         @foreach (var student in students)
                         {
+                            var isOnline = (DateTime.UtcNow - student.LastActivityAt).TotalSeconds < 120;
                             <div class="col-md-6 col-lg-4">
-                                <div class="p-3 rounded-4 bg-white-5 border @(selectedStudent?.Id == student.Id ? "border-primary" : "border-white-10") cursor-pointer transition-all" @onclick="() => SelectStudent(student)">
+                                <div class="p-3 rounded-4 bg-white-5 border @(selectedStudent?.Id == student.Id ? "border-primary" : "border-white-10") transition-all">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div class="fw-bold text-truncate" style="max-width: 120px;">@student.Nickname</div>
-                                        <span class="status-orb @GetStatusClass(student)"></span>
+                                        <div class="d-flex align-items-center gap-2 flex-grow-1 cursor-pointer" @onclick="() => SelectStudent(student)">
+                                            <div class="fw-bold text-truncate" style="max-width: 100px;">@student.Nickname</div>
+                                            <span class="status-dot @(isOnline ? "bg-success" : "bg-secondary")" title="@(isOnline ? "Online" : "Offline")" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="status-orb @GetStatusClass(student)"></span>
+                                            <button class="btn btn-sm btn-outline-danger border-0 p-1" 
+                                                    @onclick="() => RemoveStudent(student.Id)" 
+                                                    @onclick:stopPropagation="true"
+                                                    title="Odebrat studenta">
+                                                <span class="bi bi-x-lg" style="font-size: 0.75rem;"></span>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="progress bg-dark mb-2" style="height: 6px; border-radius: 3px;">
                                         <div class="progress-bar bg-primary-custom" style="width: @(student.ProgressLog?.Percentage ?? 0)%"></div>
@@ -163,7 +176,45 @@
     </div>
 </div>
 
-<!-- Modals ... (Rest of logic and styles) -->
+@if (isInviteModalVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="glass-card modal-content border-0">
+                <div class="modal-header border-bottom border-white-10 px-4 py-3">
+                    <h5 class="fw-bold mb-0">Pozvat žáky do výuky</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideInviteModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-4 p-3 rounded-4 bg-white-5 border border-white-10 text-center">
+                        <div class="small fw-bold text-muted uppercase-title mb-1">PŘÍSTUPOVÝ KÓD</div>
+                        <div class="h3 fw-bold text-primary mb-0" style="letter-spacing: 2px;">@group?.InviteCode</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-muted mb-2">EMAILOVÉ ADRESY (oddělené středníkem)</label>
+                        <textarea @bind="inviteEmails" class="form-control form-control-custom" rows="3" placeholder="student1@skola.cz; student2@skola.cz"></textarea>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(inviteStatus))
+                    {
+                        <div class="alert @(inviteStatus.Contains("Chyba") ? "alert-danger" : "alert-success") border-0 small py-2 mb-3 rounded-3">
+                            @inviteStatus
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button class="btn btn-link text-white text-decoration-none" @onclick="HideInviteModal">Zavřít</button>
+                        <button class="btn btn-primary-custom px-4" @onclick="SendInvites" disabled="@(string.IsNullOrWhiteSpace(inviteEmails) || isSendingInvites)">
+                            @if (isSendingInvites) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                            <span class="bi bi-send-fill me-2"></span>Odeslat pozvánky
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 <style>
     .bg-white-5 { background: rgba(255, 255, 255, 0.05); }
@@ -230,6 +281,11 @@
                 if (gid == GroupId) { students = await GroupService.GetGroupStudentsAsync(GroupId); await InvokeAsync(StateHasChanged); }
             });
 
+            hubConnection.On<int, DateTime>("ActivityUpdated", async (sid, lastActivity) => {
+                var s = students?.FirstOrDefault(x => x.Id == sid);
+                if (s != null) { s.LastActivityAt = lastActivity; await InvokeAsync(StateHasChanged); }
+            });
+
             await hubConnection.StartAsync();
             await hubConnection.InvokeAsync("JoinGroup", GroupId, "TEACHER", "TEACHER", true);
         }
@@ -238,6 +294,27 @@
     private string GetStatusClass(Student s) => s.Status switch { StudentStatus.NeedHelp => "help", StudentStatus.Active => "linked", StudentStatus.Inactive => "idle", StudentStatus.Completed => "completed", _ => "idle" };
 
     private async Task SelectStudent(Student s) { selectedStudent = s; selectedStudentMessages = await GroupService.GetStudentMessagesAsync(s.Id); }
+
+    private async Task RemoveStudent(int studentId)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Opravdu chcete odebrat tohoto studenta?"))
+            return;
+            
+        try
+        {
+            await StudentService.RemoveStudentAsync(studentId);
+            students = await GroupService.GetGroupStudentsAsync(GroupId);
+            
+            if (selectedStudent?.Id == studentId)
+                selectedStudent = null;
+                
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Chyba při odebírání studenta: {ex.Message}");
+        }
+    }
 
     private async Task ToggleGroupStatus() { if (group != null) { group.IsActive = !group.IsActive; await GroupService.UpdateGroupAsync(group); } }
 
@@ -252,6 +329,36 @@
 
     public async ValueTask DisposeAsync() { if (hubConnection != null) await hubConnection.DisposeAsync(); }
 
-    // Invitation logic would go here (modal etc)
-    private void ShowInviteModal() => JSRuntime.InvokeVoidAsync("alert", $"Pozvěte žáky pomocí kódu: {group?.InviteCode}");
+    private string inviteEmails = "";
+    private string inviteStatus = "";
+    private bool isSendingInvites = false;
+    private bool isInviteModalVisible = false;
+
+    private void ShowInviteModal() { isInviteModalVisible = true; inviteStatus = ""; }
+    private void HideInviteModal() => isInviteModalVisible = false;
+
+    private async Task SendInvites()
+    {
+        if (string.IsNullOrWhiteSpace(inviteEmails) || group == null) return;
+        
+        isSendingInvites = true;
+        inviteStatus = "";
+        
+        try
+        {
+            var emails = inviteEmails.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var inviteUrl = $"{NavigationManager.BaseUri}vstup/{group.InviteCode}";
+            await EmailService.SendBulkInviteAsync(emails, group.Name, group.InviteCode, inviteUrl);
+            inviteStatus = "Pozvánky byly úspěšně odeslány.";
+            inviteEmails = "";
+        }
+        catch (Exception ex)
+        {
+            inviteStatus = $"Chyba při odesílání: {ex.Message}";
+        }
+        finally
+        {
+            isSendingInvites = false;
+        }
+    }
 }

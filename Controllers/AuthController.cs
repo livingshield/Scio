@@ -55,7 +55,9 @@ public class AuthController : Controller
     [HttpGet("google-login")]
     public IActionResult GoogleLogin()
     {
-        var properties = new AuthenticationProperties { RedirectUri = Url.Action("GoogleResponse") };
+        // Ensure the redirect URI includes the base path
+        var redirectUrl = Url.Content("~/auth/google-response");
+        var properties = new AuthenticationProperties { RedirectUri = redirectUrl };
         return Challenge(properties, GoogleDefaults.AuthenticationScheme);
     }
 

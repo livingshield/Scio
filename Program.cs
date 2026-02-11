@@ -45,13 +45,14 @@ builder.Services.AddDataProtection()
 builder.Services.AddAuthentication(options => 
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     })
     .AddCookie(options =>
     {
         options.LoginPath = "/login";
         options.AccessDeniedPath = "/access-denied";
         options.Cookie.Name = "Scio_Auth";
+        options.Cookie.Path = "/scio"; // Explicitly set path for sub-app
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.Cookie.SameSite = SameSiteMode.Lax;
@@ -61,7 +62,7 @@ builder.Services.AddAuthentication(options =>
     {
         options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "YOUR_GOOGLE_CLIENT_ID";
         options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "YOUR_GOOGLE_CLIENT_SECRET";
-        // Google will sign in directly to our main cookie
+        options.CallbackPath = "/signin-google"; // Default callback path
     });
 
 builder.Services.AddAuthorization();
@@ -97,6 +98,17 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Configure Forwarded Headers BEFORE other middleware
+// Configure Forwarded Headers BEFORE other middleware
+// IMPORTANT: Clear KnownNetworks/Proxies to trust the local reverse proxy (IIS)
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+};
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 app.UsePathBase("/scio");
 
 // ENABLE DETAILED ERRORS even in production for debugging
@@ -109,18 +121,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-// Forwarded Headers for HTTPS detection behind proxies
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
-
 app.UseStaticFiles();
-app.UseAntiforgery();
+app.UseRouting(); // UseRouting must be called before Authentication
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 app.MapControllers();
 app.MapHub<ScioHub>("/sciohub");

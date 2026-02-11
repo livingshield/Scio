@@ -92,6 +92,12 @@ public class ScioHub : Hub
             isRelevant,
             studentFeedback,
             false); // isFromTeacher = false
+            
+        // 5. Broadcast activity update for online/offline indicator
+        if (student != null)
+        {
+            await Clients.Group($"group_{groupId}").SendAsync("ActivityUpdated", studentId, student.LastActivityAt);
+        }
     }
 
     public async Task SendTeacherMessage(int groupId, int studentId, string content)

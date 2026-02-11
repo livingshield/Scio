@@ -7,7 +7,7 @@
     --bg-card: rgba(13, 17, 28, 0.7);
     --border-glass: rgba(255, 255, 255, 0.1);
     --text-main: #f8fafc;
-    --text-muted: #94a3b8;
+    --text-muted: #f1f5f9;
     --font-main: 'Outfit', 'Inter', sans-serif;
 }
 
@@ -15,6 +15,7 @@ body {
     margin: 0;
     padding: 0;
     background: var(--bg-dark);
+    color: var(--text-main);
     background-image:
         radial-gradient(circle at 0% 0%, rgba(0, 210, 255, 0.15) 0%, transparent 45%),
         radial-gradient(circle at 100% 0%, rgba(168, 85, 247, 0.15) 0%, transparent 45%),
@@ -75,6 +76,21 @@ body {
     color: white;
 }
 
+.form-control-custom::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.form-control-custom::-webkit-input-placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.form-control-custom::-moz-placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
 .fade-in {
     animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -109,12 +125,14 @@ h3 {
     letter-spacing: -0.04em;
     background: linear-gradient(to bottom right, #fff 50%, #94a3b8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-primary {
     background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -177,4 +195,15 @@ h3 {
 .nav-link-custom.active {
     color: var(--primary);
     background: rgba(0, 210, 255, 0.05);
+}
+/* Bootstrap Override - svetla barva pro text-muted */
+.text-muted {
+    color: #cbd5e1 !important;
+    opacity: 1 !important;
+}
+
+/* Uppercase title styling */
+.uppercase-title {
+    color: #cbd5e1 !important;
+    opacity: 0.9;
 }

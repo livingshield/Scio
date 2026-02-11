@@ -9,6 +9,7 @@ public interface IStudentService
     Task<(bool Success, string Message, Student? Student)> JoinGroupAsync(string inviteCode, string nickname, string deviceId);
     Task<Student?> GetStudentByNicknameAndDeviceAsync(int groupId, string nickname, string deviceId);
     Task<bool> DeleteStudentAsync(int studentId);
+    Task<bool> RemoveStudentAsync(int studentId);
 }
 
 public class StudentService : IStudentService
@@ -79,5 +80,10 @@ public class StudentService : IStudentService
         _context.Students.Remove(student);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<bool> RemoveStudentAsync(int studentId)
+    {
+        return await DeleteStudentAsync(studentId);
     }
 }

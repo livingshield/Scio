@@ -82,9 +82,16 @@
                                     <img src='https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=@(Uri.EscapeDataString(NavigationManager.BaseUri + "vstup/" + group.InviteCode))' 
                                          alt="QR" style="width: 54px; height: 54px;" />
                                 </div>
-                                <div class="overflow-hidden">
+                                <div class="overflow-hidden flex-grow-1">
                                     <div class="small fw-bold text-muted uppercase-title mb-1">PŘÍSTUPOVÝ KÓD</div>
-                                    <div class="h4 fw-bold text-primary mb-0" style="letter-spacing: 2px;">@group.InviteCode</div>
+                                    <div class="h4 fw-bold text-primary mb-2" style="letter-spacing: 2px;">@group.InviteCode</div>
+                                    <div class="small text-muted mb-1">PŘÍMÝ ODKAZ</div>
+                                    <a href="@(NavigationManager.BaseUri + "vstup/" + group.InviteCode)" 
+                                       target="_blank"
+                                       class="text-primary text-decoration-none small d-block text-truncate"
+                                       style="max-width: 100%; font-size: 0.85rem;">
+                                        <span class="bi bi-link-45deg me-1"></span>@(NavigationManager.BaseUri + "vstup/" + group.InviteCode)
+                                    </a>
                                 </div>
                             </div>
                         </div>

@@ -5,217 +5,182 @@ Tento dokument slouží jako detailní plán a záznam o implementaci aplikace p
 
 ## 1. Architektura a Technologie
 
-* **Backend & Frontend:** Blazor Server (.NET 8/9) - Hostováno na Microsoft Server (IIS).
+* **Backend & Frontend:** Blazor Server (.NET 8) - Hostováno na Microsoft IIS (OutOfProcess).
   * *Důvod:* Požadavek na realtime funkcionalitu (SignalR je integrovaný), C# na obou koncích zjednodušuje vývoj.
-* **Databáze:** Microsoft SQL Server (Entity Framework Core)
-  * *Strategie:* Prefix `Scio_` pro všechny tabulky (vyhnutí se konfliktům s existujícími tabulkami)
-* **Styling:** Vanilla CSS (Sleek Dark Premium Theme) - deep navy backgrounds, glassmorphism, clean typography ('Inter' font), and professional Czech terminology.
-* **AI Integrace:** OpenAI API / Azure OpenAI (nebo lokální model, pokud bude k dispozici) pro analýzu textu a vyhodnocování cílů.
+* **Databáze:** Microsoft SQL Server (Entity Framework Core 8.0)
+  * *Strategie:* Prefix `Scio_` pro všechny tabulky (vyhnutí se konfliktům s existujícími tabulkami na sdíleném serveru)
+* **Styling:** Vanilla CSS — Dark Premium Theme (glassmorphism, fonty Outfit + Inter, neonové akcenty)
+* **AI Integrace:** Google Gemini 1.5 Flash pro sémantickou analýzu textu a vyhodnocování cílů
 * **Autentifikace:**
-  * *Fáze 1:* Klasická autentifikace (Login/Heslo + BCrypt)
-  * *Fáze 2:* Google Auth (OAuth 2.0) - přidá se po zprovoznění HTTPS
-  * RBAC (Role-Based Access Control) na úrovni aplikace
-* **Deployment:** Subdirectory `/www/scio/` na sdíleném IIS serveru
-  * *Důvod:* Server již hostuje jinou aplikaci (KikiAI) v `/www/`
+  * Klasická autentifikace (Login/Heslo + BCrypt hashování)
+  * Google OAuth 2.0 (pro učitelské účty)
+  * RBAC (Role-Based Access Control) na úrovni `[Authorize]` atributů
+* **Realtime:** SignalR Hub (`/sciohub`) pro obousměrnou komunikaci
+* **Deployment:** Subdirectory `/www/scio/` na sdíleném IIS serveru (windows11.aspone.cz)
 
-## 2. Datový Model (ER Diagram náčrt)
+## 2. Datový Model (5 tabulek)
 
 > **Poznámka:** Všechny tabulky mají prefix `Scio_` pro oddělení od existujících databázových tabulek.
 
 ### Scio_Users (Učitelské účty)
 
-* `Id` (PK)
-* `Login` (Unique) - email nebo uživatelské jméno
-* `Email`
-* `Name`
-* `PasswordHash` (BCrypt)
-* `GoogleId` (Unique, Nullable) - pro budoucí OAuth integraci
-* `Role` (enum: Teacher / Admin)
-* `CreatedAt`
+* `Id` (PK, int, auto-increment)
+* `Login` (Unique, max 100) - email nebo uživatelské jméno
+* `Email` (max 255)
+* `Name` (max 100)
+* `PasswordHash` (BCrypt, max 500) - "GOOGLE_AUTH" pro Google-only účty
+* `GoogleId` (Unique, Nullable, max 255) - partial index (IS NOT NULL)
+* `Role` (max 50) - "Teacher" nebo "Admin"
+* `CreatedAt` (default: GETUTCDATE())
 
 ### Scio_Groups
 
-* `Id` (PK)
-* `TeacherId` (FK -> Scio_Users)
-* `Name` (např. "A2 - kvadratické rovnice 1")
-* `GoalDescription` (např. "vyřeši samostatně 3 různé kvadratické rovnice...")
-* `GoalType` (enum: Boolean / Percentage)
-* `TargetValue` (např. 3 pro 3 rovnice, nebo 100 pro procenta)
-* `CreatedAt`
-* `InviteCode` (GUID pro QR kód)
-* `IsActive` (bool - aktivní/archivovaná skupina)
+* `Id` (PK, int, auto-increment)
+* `TeacherId` (FK → Scio_Users, Cascade Delete)
+* `Name` (max 200, např. "A2 - kvadratické rovnice 1")
+* `GoalDescription` (max 2000, textový popis cíle)
+* `GoalType` (enum uložený jako string: "Boolean" / "Percentage")
+* `TargetValue` (int, např. 3 pro 3 rovnice)
+* `CreatedAt` (default: GETUTCDATE())
+* `InviteCode` (Unique, max 100 - prvních 8 znaků GUID, uppercase)
+* `IsActive` (bool, default: true)
 
 ### Scio_Students (Session-based)
 
-* `Id` (PK)
-* `GroupId` (FK -> Scio_Groups)
-* `Nickname`
-* `DeviceId` (Unique per group - uloženo v LocalStorage a ověřováno)
-* `JoinedAt`
-* `LastActivityAt` (pro detekci neaktivity)
-* `Status` (enum: Active / NeedHelp / Inactive / Completed)
+* `Id` (PK, int, auto-increment)
+* `GroupId` (FK → Scio_Groups, Cascade Delete)
+* `Nickname` (max 100)
+* `DeviceId` (max 255, uloženo v LocalStorage)
+* `JoinedAt` (default: GETUTCDATE())
+* `LastActivityAt` (default: GETUTCDATE())
+* `Status` (enum jako string: "Active" / "NeedHelp" / "Inactive" / "Completed")
+* **Unique index:** (GroupId, DeviceId, Nickname)
 
 ### Scio_Messages
 
-* `Id` (PK)
-* `StudentId` (FK -> Scio_Students)
-* `GroupId` (FK -> Scio_Groups)
-* `Content` (text zprávy)
-* `Timestamp`
-* `IsSystemMessage` (bool - oznámení, varování)
-* `IsProgressContribution` (bool - AI vyhodnotilo jako příspěvek k cíli -> zvýraznění)
-* `AIConfidence` (float 0-1, confidence skóre AI analýzy)
+* `Id` (PK, int, auto-increment)
+* `StudentId` (FK → Scio_Students, Restrict Delete)
+* `GroupId` (FK → Scio_Groups, Cascade Delete)
+* `Content` (max 5000)
+* `Timestamp` (default: GETUTCDATE())
+* `IsSystemMessage` (bool, default: false)
+* `IsFromTeacher` (bool, default: false)
+* `IsProgressContribution` (bool, default: false)
+* `AIConfidence` (float?, nullable)
+* **Index:** (GroupId, Timestamp) pro rychlé načítání
 
 ### Scio_ProgressLogs
 
-* `Id` (PK)
-* `StudentId` (FK -> Scio_Students)
-* `CurrentValue` (int - aktuální hodnota progresu)
-* `TargetValue` (int - cílová hodnota z Groups)
-* `Percentage` (computed - CurrentValue / TargetValue * 100)
-* `IsCompleted` (bool)
-* `LastUpdatedAt`
-* `CompletedAt` (nullable - čas dokončení)
+* `Id` (PK, int, auto-increment)
+* `StudentId` (FK → Scio_Students, 1:1, Cascade Delete, Unique index)
+* `CurrentValue` (int, default: 0)
+* `TargetValue` (int)
+* `Percentage` (computed: CurrentValue / TargetValue * 100)
+* `IsCompleted` (bool, default: false)
+* `LastUpdatedAt` (default: GETUTCDATE())
+* `CompletedAt` (DateTime?, nullable)
 
-## 3. Klíčové Funkcionality a Implementace
+### Migrace
 
-### A. Autentifikace a RBAC
+1. `20260209123849_InitialCreate` — Všechny tabulky, indexy, vztahy
+2. `20260210214005_AddIsFromTeacher` — Přidání `IsFromTeacher` na Message
+3. `20260210221427_AllowMultipleStudentsPerDevice` — Úprava unique indexu Students
 
-**Fáze 1 (bez HTTPS):**
+## 3. Klíčové Funkcionality
 
-* Klasická autentifikace: Login + Password (BCrypt hashing)
-* Cookie-based sessions
-* Registrační formulář pro učitele
-* Login stránka s validací
+### A. Autentifikace (`AuthController.cs` + `AuthService.cs`)
 
-**Fáze 2 (po zprovoznění HTTPS):**
+* **Klasický login:** POST `/auth/login` → BCrypt.Verify → Cookie sign-in
+* **Google OAuth:** GET `/auth/google-login` → Challenge → Google callback → `/auth/google-response`
+  * Automatický merge účtu, pokud existuje email
+  * Vytvoření nového účtu, pokud neexistuje
+* **Logout:** GET `/auth/logout` → SignOut → Redirect na login
+* **Cookies:** HttpOnly, Secure, SameSite=Lax, Path=/scio, 7 dní
 
-* Implementace Google OAuth 2.0
-* Propojení existujících účtů s Google ID
-* Dual authentication (Google OR klasický login)
+### B. Učitelský Dashboard
 
-**RBAC:**
+* **Home.razor (`/`):** Mřížka skupin s gradientními kartami, modal pro vytvoření nové skupiny, QR kódy
+* **GroupDetail.razor (`/group/{id}`):** Realtime monitoring — plovoucí karty žáků s progress bary, historie zpráv, odesílání zpráv učitelem, emailové pozvánky
 
-* Vytvoření `BaseComponent` nebo Services pro kontrolu rolí
-* Authorization policies pro Teacher/Admin role
+### C. Studentské Rozhraní
 
-### B. Učitelský Dashboard (Teacher View)
+* **Entrance.razor (`/vstup/{inviteCode}`):** Vstupní stránka — validace InviteCode, DeviceId z LocalStorage, formulář pro Nickname
+* **Chat.razor (`/chat/{groupId}`):** Bublinový chat, AI zpětná vazba pod každou zprávou, progressbar/checkmark nahoře, tlačítko "potřebuji pomoc", hlasové diktování
 
-* **Seznam skupin:** Tabulka s přehledem, tlačítko "Vytvořit skupinu".
-* **Vytvoření skupiny:** Modální okno / stránka s formulářem (Název, Cíl, Typ cíle).
-* **Detail skupiny (Realtime):**
-  * Využití Blazor `HubConnection` (SignalR).
-  * Grid zobrazení studentů.
-  * Každá karta studenta ukazuje: Nick, Progress Bar, Status indikátor.
-  * Možnost označit "NeedHelp" jako vyřešené.
-  * (Bonus) Rozklik detailu studenta -> načtení historie zpráv.
+### D. SignalR Hub (`ScioHub.cs`)
 
-### C. Studentské Rozhraní (Student View)
+Obousměrná komunikace v reálném čase:
 
-* **Vstup:** Scan QR kódu -> URL `/join/{inviteCode}`.
-* **Validace:** Kontrola LocalStorage. Pokud existuje token pro tuto skupinu, rovnou přihlásí. Pokud ne, formulář pro Nickname -> uložení tokenu.
-* **Chat:**
-  * Jednoduché chatovací rozhraní (příchozí/odchozí bubliny).
-  * Nahoře fixní lišta s popisem cíle a aktuálním progresem.
-* **Logika:**
-  * Odeslání zprávy -> SignalR event na server.
-  * Server uloží zprávu.
-  * **AI Background Task:**
-    * Server pošle zprávu (a kontext) do AI služby.
-    * Prompt: "Analyzuj, zda tato zpráva posouvá studenta k cíli: {GoalDescription}. Odpověz JSON: { isProgress: bool, newProgressValue: int, feedback: string }."
-    * Aktualizace `ProgressLogs` a `Messages` (IsProgressContribution).
-    * Odeslání aktualizace klientům (Student i Učitel) přes SignalR.
-  * **System Watchdog:**
-    * Timer na serveru/klientovi sleduje neaktivitu.
-    * Pokud student nepíše X minut -> Varování do chatu.
-    * Pokud stále nic -> Změna statusu na `Inactive` -> notifikace učiteli.
+* **Klient → Server:** `SendMessage`, `SendTeacherMessage`, `ApproveMessage`, `UpdateProgress`, `SignalNeedHelp`
+* **Server → Klient:** `ReceiveMessage`, `ProgressUpdated`, `StatusChanged`, `MessageApproved`, `UserJoined`
 
-### D. AI Integrace
+### E. AI Integrace (`GeminiAIService.cs`)
 
-* Vytvoření `IAIService` rozhraní.
-* Implementace `OpenAIService` (nebo jiné).
-* System prompt inženýrství pro správné vyhodnocování pokroku dle volného popisu cíle.
+* **API:** Google Gemini 1.5 Flash (REST, JSON response)
+* **Timeout:** 15 sekund
+* **Prompt:** Systémová instrukce + kontext úkolu + zpráva studenta
+* **Výstup:** JSON s `isProgress`, `isRelevant`, `newProgressValue`, `feedback`, `studentFeedback`
+* **Fallback:** Pokud AI selže, zpráva je označena jako relevantní a pokrok se nemění
 
-## 4. Postup Implementace (Kroky)
+### F. Email Service (`EmailService.cs`)
 
-### Fáze 1: Základní funkcionalita (bez HTTPS)
+* **SMTP:** MailKit s TLS (StartTls)
+* **Funkce:** `SendEmailAsync` (individuální), `SendBulkInviteAsync` (hromadné)
+* **Podpora:** Vícenásobní příjemci (oddělovač `;`), HTML šablona s přímým odkazem
 
-1. **Setup:**
-   * Založení Blazor Server projektu
-   * Konfigurace EF Core s `Scio_` table prefix
-   * Vytvoření všech entity tříd a DbContext
-   * První migrace a aplikace na produkční DB
+## 4. NuGet Balíčky
 
-2. **Auth:**
-   * Implementace klasické autentifikace (Login/Password)
-   * Registrace učitelů
-   * Cookie-based authentication
-   * Authorization policies
+| Balíček | Verze | Účel |
+|---|---|---|
+| BCrypt.Net-Next | 4.0.3 | Hashování hesel |
+| MailKit | 4.14.1 | SMTP emailing |
+| Microsoft.AspNetCore.Authentication.Google | 8.0.0 | Google OAuth |
+| Microsoft.AspNetCore.SignalR.Client | 8.0.0 | SignalR klient (pro Blazor komponenty) |
+| Microsoft.EntityFrameworkCore.SqlServer | 8.0.0 | SQL Server provider |
+| Microsoft.EntityFrameworkCore.Design | 8.0.0 | Migrace (dev-only) |
+| Microsoft.EntityFrameworkCore.Tools | 8.0.0 | CLI nástroje (dev-only) |
 
-3. **Teacher Core:**
-   * CRUD pro Skupiny (Create, Read, Update, Delete)
-   * Generování QR kódů s InviteCode
-   * Seznam skupin s přehledem
+## 5. Middleware Pipeline (`Program.cs`)
 
-4. **Student Core:**
-   * Join flow přes QR kód/InviteCode
-   * LocalStorage handling (DeviceId)
-   * Nickname validace a ukládání
-   * Základní Chat UI
+```
+ForwardedHeaders (X-Forwarded-For, X-Forwarded-Proto)
+  ↓
+PathBase("/scio")
+  ↓
+DeveloperExceptionPage
+  ↓
+HSTS (production only)
+  ↓
+HttpsRedirection
+  ↓
+StaticFiles
+  ↓
+Routing
+  ↓
+Authentication
+  ↓
+Authorization
+  ↓
+Antiforgery
+  ↓
+MapControllers + MapHub + MapRazorComponents
+```
 
-5. **Realtime:**
-   * SignalR Hub pro chat
-   * Broadcast zpráv ve skupině
-   * Online status tracking
-
-6. **AI Logic:**
-   * Implementace AI služby (OpenAI API)
-   * Prompt engineering pro vyhodnocování zpráv
-   * Update progresu na základě AI analýzy
-   * Zvýraznění zpráv přispívajících k cíli
-
-7. **Dashboard:**
-   * Realtime zobrazení studentů
-   * Progress bars/checkmarks
-   * Status indikátory (Active/NeedHelp/Inactive)
-   * Notifikace pro učitele
-
-8. **Polish:**
-   * Elegant Dark Premium (Vanilla CSS)
-   * Responsivní design pro mobilní telefony
-   * Plynulé animace a skleněné efekty
-   * Čistá česká terminologie (bez žargonu)
-   * Watchdog timer pro neaktivitu
-
-9. **Deployment:**
-   * Konfigurace pro subdirectory `/www/scio/`
-   * FTP upload
-   * IIS sub-application setup (web.config)
-   * Testování SignalR konektivity
-
-### Fáze 2: Google OAuth (DOKONČENO)
-
-1. **Google Auth:**
-    * Konfigurace Google Cloud Console (Aktivní)
-    * Implementace OAuth 2.0 flow (Dokončeno)
-    * Propojení s existujícími účty (Dokončeno)
-    * Dual authentication support (Dokončeno)
-
-## 6. Aktuální Konfigurace a Provoz
+## 6. Aktuální Konfigurace
 
 * **URL:** `https://www.ekobio.org/scio/`
-* **Hosting:** Aspone (Windows IIS)
-  * Režim: `OutOfProcess` (sdílený App Pool s KikiAI)
-  * Podsložka: `/www/scio/`
-* **Autentifikace:**
-  * Google OAuth 2.0 (ClientId: 335921-...)
-  * Klasické heslo (BCrypt)
-* **AI:** OpenAI GPT-4o-mini (vyžaduje API klíč v `appsettings.json`)
+* **Hosting:** Aspone (Windows IIS, OutOfProcess)
+* **DB Server:** sql8.aspone.cz
+* **Autentifikace:** Google OAuth 2.0 + klasické heslo (BCrypt)
+* **AI:** Google Gemini 1.5 Flash (API klíč v `appsettings.json`)
 * **Realtime:** SignalR Hub (`/sciohub`)
 * **HTTPS:** Vynuceno (`app.UseHttpsRedirection()`)
 
-## 5. Bonusy (pokud zbude čas)
+## 7. Bonusy (implementováno)
 
-* Podpora Markdown/LaTeX v chatu.
-* Speech-to-Text (Web Speech API) pro diktování.
-* Export dat pro učitele.
+* [x] Podpora Markdown/LaTeX v chatu (MathJax)
+* [x] Speech-to-Text (Web Speech API) pro diktování
+* [x] Emailové pozvánky s přímým odkazem
+* [x] Detail studenta s klíčovými zprávami
+* [x] Schvalování pokroku učitelem
+* [x] Cy Ber-Edu futuristický design (Glassmorphism + Neon)

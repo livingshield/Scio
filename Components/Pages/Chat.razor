@@ -37,8 +37,13 @@ else if (student != null)
                         </div>
                     </div>
                 </div>
-                <div class="badge bg-white-5 border border-white-10 text-primary py-2 px-3 rounded-pill fw-medium">
-                    <span class="bi bi-person-fill me-1"></span> @student.Nickname
+                <div class="d-flex align-items-center gap-3">
+                    <div class="badge bg-white-5 border border-white-10 text-primary py-2 px-3 rounded-pill fw-medium">
+                        <span class="bi bi-person-fill me-1"></span> @student.Nickname
+                    </div>
+                    <button class="btn btn-sm btn-outline-light border-white-10 rounded-pill px-3 py-2" @onclick="LogoutStudent">
+                        <span class="bi bi-box-arrow-right me-1"></span> Odhlásit se
+                    </button>
                 </div>
             </div>
         </header>
@@ -293,5 +298,23 @@ else if (student != null)
     private void ScrollToBottom() => JSRuntime.InvokeVoidAsync("scrollToBottom", "chatLines");
     private async Task StartVoice() { isListening = true; objRefContent = DotNetObjectReference.Create(this); await JSRuntime.InvokeVoidAsync("startVoiceRecognition", objRefContent); }
     [JSInvokable] public void OnVoiceResult(string text) { newMessage += (string.IsNullOrEmpty(newMessage) ? "" : " ") + text; isListening = false; StateHasChanged(); }
+    
+    private async Task LogoutStudent()
+    {
+        // Vymazat LocalStorage klíče
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", $"scio_device_{GroupId}");
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", $"scio_nick_{GroupId}");
+        
+        // Odpojit SignalR
+        if (hubConnection != null)
+        {
+            await hubConnection.StopAsync();
+            await hubConnection.DisposeAsync();
+        }
+        
+        // Přesměrovat na vstupní stránku
+        NavigationManager.NavigateTo($"/vstup/{group?.InviteCode ?? GroupId.ToString()}", true);
+    }
+    
     public async ValueTask DisposeAsync() { objRefContent?.Dispose(); inactivityTimer?.Dispose(); if (hubConnection != null) await hubConnection.DisposeAsync(); }
 }
